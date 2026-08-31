@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = ["gotatun-throughput"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.95"
+license = "MPL-2.0"
+
+[workspace.dependencies]
+anyhow = "1.0"
+benchy-lib = { path = "../../app-bench/benchy-lib" }
+benchy-runner = { path = "../../app-bench/benchy-runner" }
+clap = { version = "4.5", features = ["derive", "env"] }
+gotatun = { path = "../gotatun", default-features = false, features = ["device", "ring", "tun"] }
+hex = "0.4"
+ipnetwork = "0.21"
+rand = "0.9"
+tokio = { version = "1.43", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
