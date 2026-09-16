@@ -517,7 +517,9 @@ impl Packet {
             }
             (WgPacketType::CookieReply, WgCookieReply::LEN) => Ok(WgKind::CookieReply(self.cast())),
             (WgPacketType::Data, WgData::OVERHEAD..) => Ok(WgKind::Data(self.cast())),
-            _ => bail!("Not a wireguard packet, bad type/size."),
+            _ => {
+                bail!("Not a wireguard packet, bad type/size.");
+            }
         }
     }
 }
