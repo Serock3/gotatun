@@ -136,7 +136,7 @@ fn wait_for_child(sock: UnixDatagram) -> Result<()> {
     if buf == CHILD_OK {
         Ok(())
     } else {
-        bail!("Child process failed to initialize")
+        bail!("Child process failed to initialize");
     }
 }
 

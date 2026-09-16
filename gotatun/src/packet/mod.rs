@@ -365,7 +365,9 @@ impl Packet<Ip> {
 
                 decoder.decode_owned(self).map(Either::Right)
             }
-            v => bail!("Bad IP version: {v}"),
+            v => {
+                bail!("Bad IP version: {v}");
+            }
         }
         .map_err(Into::into)
     }
