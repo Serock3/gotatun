@@ -45,7 +45,6 @@ duplicate = { workspace = true, default-features = false }
 either = { workspace = true }
 eyre = { workspace = true }
 futures = { workspace = true }
-hex = { workspace = true }
 hmac = { workspace = true }
 ip_network = { workspace = true }
 ip_network_table = { workspace = true }
@@ -75,6 +74,7 @@ zerocopy = { workspace = true, features = ["derive", "std"] }
 [dev-dependencies]
 criterion = { workspace = true, features = ["html_reports"] }
 etherparse = { workspace = true }
+hex = { workspace = true }
 test-log = { workspace = true }
 tokio-stream = { workspace = true, features = ["sync"] }
 x25519-dalek = { workspace = true, features = ["getrandom"] }
