@@ -302,7 +302,7 @@ impl<T: DeviceTransports> DeviceWrite<'_, T> {
     pub async fn modify_peer(
         &mut self,
         public_key: &PublicKey,
-        f: impl for<'a> FnOnce(&mut PeerMut),
+        f: impl FnOnce(&mut PeerMut),
     ) -> bool {
         let Some(existing_peer) = self.device.peers.get(public_key) else {
             return false;
@@ -563,7 +563,7 @@ impl<T: DeviceTransports> Device<T> {
     pub async fn modify_peer(
         &mut self,
         public_key: &PublicKey,
-        f: impl for<'a> FnOnce(&mut PeerMut),
+        f: impl FnOnce(&mut PeerMut),
     ) -> Result<bool, Error> {
         self.write(async |device| device.modify_peer(public_key, f).await)
             .await
