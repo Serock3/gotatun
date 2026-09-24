@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
-[package.metadata.app-bench]
+[package.metadata.benchy]
 id = "gotatun-throughput"
 default = true
 

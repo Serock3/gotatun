@@ -1,9 +1,9 @@
 # GotaTun system benchmarks
 
 This is a separate Cargo workspace containing the benchmark definitions for this repository. The
-shared runner and result format live in the sibling `app-bench` repository.
+shared runner and temporary result artifacts live in the sibling `benchy` repository.
 
-Run the default benchmark set through `benchy-cli` from `app-bench`, or run the first scenario
+Run the default benchmark set through `benchy-cli` from `benchy`, or run the first scenario
 directly:
 
 ```console
@@ -19,14 +19,14 @@ Both hosts need passwordless access to the narrow privileged operations used by 
 
 Configuration is read at runtime:
 
-- `APP_BENCH_PEER` (default `mole@10.0.0.2`)
-- `APP_BENCH_ALICE_ADDRESS` (default `10.0.0.1`)
-- `APP_BENCH_BOB_ADDRESS` (default `10.0.0.2`)
-- `APP_BENCH_INTERFACE` (default `bench0`)
-- `APP_BENCH_WIREGUARD_PORT` (default `51821`)
-- `APP_BENCH_IPERF_PORT` (default `5201`)
-- `APP_BENCH_DURATION` (default `30` seconds)
-- `APP_BENCH_MTU` (default `1440`)
+- `BENCHY_PEER` (default `mole@10.0.0.2`)
+- `BENCHY_ALICE_ADDRESS` (default `10.0.0.1`)
+- `BENCHY_BOB_ADDRESS` (default `10.0.0.2`)
+- `BENCHY_INTERFACE` (default `bench0`)
+- `BENCHY_WIREGUARD_PORT` (default `51821`)
+- `BENCHY_IPERF_PORT` (default `5201`)
+- `BENCHY_DURATION` (default `30` seconds)
+- `BENCHY_MTU` (default `1440`)
 
 WireGuard key material is generated for each run and is not stored in GitHub. The SSH host identity
 is provisioned on the benchmark controller rather than injected into branch-controlled code.

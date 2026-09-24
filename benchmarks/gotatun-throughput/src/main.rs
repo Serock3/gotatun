@@ -33,7 +33,7 @@ const DEFINITION: BenchmarkDefinition = BenchmarkDefinition {
     name: "gotatun-throughput",
     description: "GotaTun tunnel throughput measured with iperf3",
 };
-const READY_MARKER: &str = "APP_BENCH_READY";
+const READY_MARKER: &str = "BENCHY_READY";
 
 #[derive(Parser)]
 #[command(version, about = "Two-host GotaTun throughput benchmark")]
@@ -120,19 +120,19 @@ async fn main() -> Result<()> {
 
 fn controller_config() -> Result<ControllerConfig> {
     Ok(ControllerConfig {
-        peer: env_value("APP_BENCH_PEER", "mole@10.0.0.2"),
-        alice_address: env_value("APP_BENCH_ALICE_ADDRESS", "10.0.0.1").parse()?,
-        bob_address: env_value("APP_BENCH_BOB_ADDRESS", "10.0.0.2").parse()?,
-        interface: env_value("APP_BENCH_INTERFACE", "bench0"),
-        listen_port: env_value("APP_BENCH_WIREGUARD_PORT", "51821").parse()?,
-        iperf_port: env_value("APP_BENCH_IPERF_PORT", "5201").parse()?,
-        duration: env_value("APP_BENCH_DURATION", "30").parse()?,
-        mtu: env_value("APP_BENCH_MTU", "1440").parse()?,
+        peer: env_value("BENCHY_PEER", "mole@10.0.0.2"),
+        alice_address: env_value("BENCHY_ALICE_ADDRESS", "10.0.0.1").parse()?,
+        bob_address: env_value("BENCHY_BOB_ADDRESS", "10.0.0.2").parse()?,
+        interface: env_value("BENCHY_INTERFACE", "bench0"),
+        listen_port: env_value("BENCHY_WIREGUARD_PORT", "51821").parse()?,
+        iperf_port: env_value("BENCHY_IPERF_PORT", "5201").parse()?,
+        duration: env_value("BENCHY_DURATION", "30").parse()?,
+        mtu: env_value("BENCHY_MTU", "1440").parse()?,
     })
 }
 
 async fn run_controller(config: &ControllerConfig) -> Result<benchy_lib::iperf::Output> {
-    let _machine_lock = MachineLock::acquire("/tmp/app-bench.lock")?;
+    let _machine_lock = MachineLock::acquire("/tmp/benchy.lock")?;
     let alice_private = StaticSecret::from(rand::random::<[u8; 32]>());
     let bob_private = StaticSecret::from(rand::random::<[u8; 32]>());
     let alice_public = PublicKey::from(&alice_private);
@@ -162,7 +162,7 @@ async fn run_controller(config: &ControllerConfig) -> Result<benchy_lib::iperf::
 
     let executable = env::current_exe().context("failed to locate benchmark executable")?;
     let run_id = env::var("GITHUB_RUN_ID").unwrap_or_else(|_| std::process::id().to_string());
-    let remote_dir = format!("/tmp/app-bench-{run_id}");
+    let remote_dir = format!("/tmp/benchy-{run_id}");
     let remote_executable = format!("{remote_dir}/gotatun-throughput");
     deploy(&config.peer, &executable, &remote_dir, &remote_executable).await?;
 

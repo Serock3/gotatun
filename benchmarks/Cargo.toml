@@ -9,8 +9,8 @@ license = "MPL-2.0"
 
 [workspace.dependencies]
 anyhow = "1.0"
-benchy-lib = { path = "../../app-bench/benchy-lib" }
-benchy-runner = { path = "../../app-bench/benchy-runner" }
+benchy-lib = { path = "../../benchy/benchy-lib" }
+benchy-runner = { path = "../../benchy/benchy-runner" }
 clap = { version = "4.5", features = ["derive", "env"] }
 gotatun = { path = "../gotatun", default-features = false, features = ["device", "ring", "tun"] }
 hex = "0.4"

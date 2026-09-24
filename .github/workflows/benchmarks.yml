@@ -1,8 +1,6 @@
 name: Benchmarks
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       benchmarks:
@@ -15,7 +13,7 @@ permissions: {}
 
 jobs:
   benchmark:
-    uses: mullvad/app-bench/.github/workflows/run-benchmarks.yml@app-bench-rework
+    uses: Serock3/benchy/.github/workflows/run-benchmarks.yml@main
     with:
       benchmarks: ${{ inputs.benchmarks || 'default' }}
       manifest-path: benchmarks/Cargo.toml
