@@ -121,27 +121,27 @@ async fn main() -> Result<()> {
     match run_controller(&config).await {
         Ok(output) => {
             recorder.value(
-                "Bob to Alice sender throughput",
+                "Sender throughput",
                 Value::Bps(output.iperf.end.sum_sent.bits_per_second),
             );
             recorder.value(
-                "Bob to Alice receiver throughput",
+                "Receiver throughput",
                 Value::Bps(output.iperf.end.sum_received.bits_per_second),
             );
             recorder.value(
-                "Alice iperf CPU",
+                "DOWN iperf CPU",
                 Value::Percent(output.iperf.end.cpu_utilization_percent.remote_total),
             );
             recorder.value(
-                "Bob iperf CPU",
+                "UP iperf CPU",
                 Value::Percent(output.iperf.end.cpu_utilization_percent.host_total),
             );
             recorder.value(
-                "Alice GotaTun CPU",
+                "DOWN GotaTun CPU",
                 Value::Percent(output.alice_gotatun_cpu_percent),
             );
             recorder.value(
-                "Bob GotaTun CPU",
+                "UP GotaTun CPU",
                 Value::Percent(output.bob_gotatun_cpu_percent),
             );
             recorder.success().await

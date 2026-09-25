@@ -16,9 +16,9 @@ cargo run --release --locked \
 The throughput scenario runs on the controller host and deploys its current executable to the peer.
 It embeds the GotaTun library, but invokes the host's `ip`, `ssh`, `scp`, `ping`, and `iperf3` tools.
 Both hosts need passwordless access to the narrow privileged operations used by the benchmark.
-The result records sender- and receiver-reported throughput plus the Alice and Bob process CPU usage
-for both iperf3 and GotaTun. CPU percentages are normalized to one logical core and may exceed 100%
-when a process uses multiple cores.
+The result records sender- and receiver-reported throughput plus process CPU usage for iperf3 and
+GotaTun on the outbound (`UP`) and inbound (`DOWN`) paths. CPU percentages are normalized to one
+logical core and may exceed 100% when a process uses multiple cores.
 
 Configuration is read at runtime:
 
