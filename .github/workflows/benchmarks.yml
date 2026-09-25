@@ -9,7 +9,8 @@ on:
         default: default
         type: string
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   benchmark:
