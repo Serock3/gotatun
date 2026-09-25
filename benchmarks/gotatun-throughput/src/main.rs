@@ -8,10 +8,11 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
     process::Stdio,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use anyhow::{Context, Result, bail};
+use benchy_lib::Value;
 use benchy_runner::{
     BenchmarkDefinition, MachineLock, Recorder, checked_output, default_output_path,
     parse_iperf_output,
@@ -85,6 +86,17 @@ struct ControllerConfig {
     mtu: u16,
 }
 
+struct BenchmarkOutput {
+    iperf: benchy_lib::iperf::Output,
+    alice_gotatun_cpu_percent: f64,
+    bob_gotatun_cpu_percent: f64,
+}
+
+struct ProcessCpuSample {
+    ticks: u64,
+    observed_at: Instant,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -107,8 +119,31 @@ async fn main() -> Result<()> {
     recorder.parameter("listen_port", config.listen_port);
 
     match run_controller(&config).await {
-        Ok(iperf) => {
-            recorder.record_iperf(&iperf);
+        Ok(output) => {
+            recorder.value(
+                "Bob to Alice sender throughput",
+                Value::Bps(output.iperf.end.sum_sent.bits_per_second),
+            );
+            recorder.value(
+                "Bob to Alice receiver throughput",
+                Value::Bps(output.iperf.end.sum_received.bits_per_second),
+            );
+            recorder.value(
+                "Alice iperf CPU",
+                Value::Percent(output.iperf.end.cpu_utilization_percent.remote_total),
+            );
+            recorder.value(
+                "Bob iperf CPU",
+                Value::Percent(output.iperf.end.cpu_utilization_percent.host_total),
+            );
+            recorder.value(
+                "Alice GotaTun CPU",
+                Value::Percent(output.alice_gotatun_cpu_percent),
+            );
+            recorder.value(
+                "Bob GotaTun CPU",
+                Value::Percent(output.bob_gotatun_cpu_percent),
+            );
             recorder.success().await
         }
         Err(error) => {
@@ -131,7 +166,7 @@ fn controller_config() -> Result<ControllerConfig> {
     })
 }
 
-async fn run_controller(config: &ControllerConfig) -> Result<benchy_lib::iperf::Output> {
+async fn run_controller(config: &ControllerConfig) -> Result<BenchmarkOutput> {
     let _machine_lock = MachineLock::acquire("/tmp/benchy.lock")?;
     let alice_private = StaticSecret::from(rand::random::<[u8; 32]>());
     let bob_private = StaticSecret::from(rand::random::<[u8; 32]>());
@@ -193,19 +228,47 @@ async fn run_controller(config: &ControllerConfig) -> Result<benchy_lib::iperf::
         .context("failed to start local iperf3 server")?;
 
     sleep(Duration::from_millis(250)).await;
-    let iperf_command = remote_command(
-        "iperf3",
-        &[
-            "--client".to_owned(),
-            local_args.tunnel_address.to_string(),
-            "--port".to_owned(),
-            config.iperf_port.to_string(),
-            "--time".to_owned(),
-            config.duration.to_string(),
-            "--json".to_owned(),
-        ],
-    );
-    let output = checked_output("ssh", [&config.peer, &iperf_command]).await;
+    let result = async {
+        let (alice_clock_ticks, bob_clock_ticks) = tokio::try_join!(
+            clock_ticks_per_second(None),
+            clock_ticks_per_second(Some(&config.peer)),
+        )?;
+        let (alice_before, bob_before) = tokio::try_join!(
+            process_cpu_sample(None, local_pid),
+            process_cpu_sample(Some(&config.peer), remote_pid),
+        )?;
+
+        let iperf_command = remote_command(
+            "iperf3",
+            &[
+                "--client".to_owned(),
+                local_args.tunnel_address.to_string(),
+                "--port".to_owned(),
+                config.iperf_port.to_string(),
+                "--time".to_owned(),
+                config.duration.to_string(),
+                "--json".to_owned(),
+            ],
+        );
+        let output = checked_output("ssh", [&config.peer, &iperf_command]).await?;
+
+        let (alice_after, bob_after) = tokio::try_join!(
+            process_cpu_sample(None, local_pid),
+            process_cpu_sample(Some(&config.peer), remote_pid),
+        )?;
+        let iperf = parse_iperf_output(output).await?;
+
+        Ok(BenchmarkOutput {
+            iperf,
+            alice_gotatun_cpu_percent: process_cpu_percent(
+                &alice_before,
+                &alice_after,
+                alice_clock_ticks,
+            )?,
+            bob_gotatun_cpu_percent: process_cpu_percent(&bob_before, &bob_after, bob_clock_ticks)?,
+        })
+    }
+    .await;
 
     stop_endpoint(None, local_pid).await;
     stop_endpoint(Some(&config.peer), remote_pid).await;
@@ -213,7 +276,82 @@ async fn run_controller(config: &ControllerConfig) -> Result<benchy_lib::iperf::
     let _ = remote.wait().await;
     let _ = iperf_server.kill().await;
 
-    parse_iperf_output(output?).await
+    result
+}
+
+async fn clock_ticks_per_second(peer: Option<&str>) -> Result<u64> {
+    let output = match peer {
+        Some(peer) => {
+            let command = remote_command("getconf", &["CLK_TCK".to_owned()]);
+            checked_output("ssh", [peer, &command]).await?
+        }
+        None => checked_output("getconf", ["CLK_TCK"]).await?,
+    };
+    String::from_utf8(output.stdout)
+        .context("getconf returned non-UTF-8 output")?
+        .trim()
+        .parse()
+        .context("getconf returned an invalid CLK_TCK value")
+}
+
+async fn process_cpu_sample(peer: Option<&str>, pid: u32) -> Result<ProcessCpuSample> {
+    let path = format!("/proc/{pid}/stat");
+    let request_started = Instant::now();
+    let stat = match peer {
+        Some(peer) => {
+            let command = remote_command("cat", std::slice::from_ref(&path));
+            let output = checked_output("ssh", [peer, &command]).await?;
+            String::from_utf8(output.stdout).context("remote process stat was not UTF-8")?
+        }
+        None => tokio::fs::read_to_string(&path)
+            .await
+            .with_context(|| format!("failed to read {path}"))?,
+    };
+    let request_finished = Instant::now();
+
+    Ok(ProcessCpuSample {
+        ticks: parse_process_cpu_ticks(&stat)?,
+        observed_at: request_started + (request_finished - request_started) / 2,
+    })
+}
+
+fn parse_process_cpu_ticks(stat: &str) -> Result<u64> {
+    let command_end = stat
+        .rfind(") ")
+        .context("process stat did not contain a command name")?;
+    let mut fields = stat[command_end + 2..].split_ascii_whitespace();
+    let user_ticks: u64 = fields
+        .nth(11)
+        .context("process stat did not contain user CPU time")?
+        .parse()
+        .context("process stat contained invalid user CPU time")?;
+    let system_ticks: u64 = fields
+        .next()
+        .context("process stat did not contain system CPU time")?
+        .parse()
+        .context("process stat contained invalid system CPU time")?;
+    user_ticks
+        .checked_add(system_ticks)
+        .context("process CPU time overflowed")
+}
+
+fn process_cpu_percent(
+    before: &ProcessCpuSample,
+    after: &ProcessCpuSample,
+    clock_ticks_per_second: u64,
+) -> Result<f64> {
+    let elapsed = after
+        .observed_at
+        .checked_duration_since(before.observed_at)
+        .context("process CPU samples were out of order")?;
+    let elapsed_ticks = after
+        .ticks
+        .checked_sub(before.ticks)
+        .context("process CPU time moved backwards")?;
+    if elapsed.is_zero() || clock_ticks_per_second == 0 {
+        bail!("cannot calculate process CPU usage over an empty interval");
+    }
+    Ok(elapsed_ticks as f64 / clock_ticks_per_second as f64 / elapsed.as_secs_f64() * 100.0)
 }
 
 async fn run_endpoint(args: EndpointArgs) -> Result<()> {
@@ -444,7 +582,12 @@ fn env_value(key: &str, default: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_key, remote_command, shell_quote};
+    use std::time::{Duration, Instant};
+
+    use super::{
+        ProcessCpuSample, decode_key, parse_process_cpu_ticks, process_cpu_percent, remote_command,
+        shell_quote,
+    };
 
     #[test]
     fn shell_arguments_are_single_quoted() {
@@ -460,5 +603,31 @@ mod tests {
     fn keys_must_be_exactly_32_bytes() {
         assert!(decode_key(&"01".repeat(32)).is_ok());
         assert!(decode_key(&"01".repeat(31)).is_err());
+    }
+
+    #[test]
+    fn process_stat_cpu_ticks_allow_spaces_in_command_name() {
+        let mut fields = vec!["0"; 13];
+        fields[0] = "S";
+        fields[11] = "120";
+        fields[12] = "30";
+        let stat = format!("123 (gotatun throughput) {}", fields.join(" "));
+
+        assert_eq!(parse_process_cpu_ticks(&stat).unwrap(), 150);
+    }
+
+    #[test]
+    fn process_cpu_is_percentage_of_one_core() {
+        let start = Instant::now();
+        let before = ProcessCpuSample {
+            ticks: 100,
+            observed_at: start,
+        };
+        let after = ProcessCpuSample {
+            ticks: 150,
+            observed_at: start + Duration::from_secs(1),
+        };
+
+        assert_eq!(process_cpu_percent(&before, &after, 100).unwrap(), 50.0);
     }
 }
