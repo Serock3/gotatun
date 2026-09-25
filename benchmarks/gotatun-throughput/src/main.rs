@@ -12,10 +12,10 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use benchy_lib::Value;
+use benchy_lib::Unit;
 use benchy_runner::{
-    BenchmarkDefinition, MachineLock, Recorder, checked_output, default_output_path,
-    parse_iperf_output,
+    BenchmarkDefinition, MachineLock, MeasurementDefinition, Recorder, checked_output,
+    default_output_path, parse_iperf_output,
 };
 use clap::{Args, Parser, Subcommand};
 use gotatun::{
@@ -33,6 +33,36 @@ const DEFINITION: BenchmarkDefinition = BenchmarkDefinition {
     repository: "gotatun",
     name: "gotatun-throughput",
     description: "GotaTun tunnel throughput measured with iperf3",
+};
+const SENDER_THROUGHPUT: MeasurementDefinition = MeasurementDefinition {
+    id: "throughput.sender",
+    label: "Sender throughput",
+    unit: Unit::BitsPerSecond,
+};
+const RECEIVER_THROUGHPUT: MeasurementDefinition = MeasurementDefinition {
+    id: "throughput.receiver",
+    label: "Receiver throughput",
+    unit: Unit::BitsPerSecond,
+};
+const DOWN_IPERF_CPU: MeasurementDefinition = MeasurementDefinition {
+    id: "cpu.iperf.down",
+    label: "DOWN iperf CPU",
+    unit: Unit::Percent,
+};
+const UP_IPERF_CPU: MeasurementDefinition = MeasurementDefinition {
+    id: "cpu.iperf.up",
+    label: "UP iperf CPU",
+    unit: Unit::Percent,
+};
+const DOWN_GOTATUN_CPU: MeasurementDefinition = MeasurementDefinition {
+    id: "cpu.gotatun.down",
+    label: "DOWN GotaTun CPU",
+    unit: Unit::Percent,
+};
+const UP_GOTATUN_CPU: MeasurementDefinition = MeasurementDefinition {
+    id: "cpu.gotatun.up",
+    label: "UP GotaTun CPU",
+    unit: Unit::Percent,
 };
 const READY_MARKER: &str = "BENCHY_READY";
 
@@ -120,30 +150,21 @@ async fn main() -> Result<()> {
 
     match run_controller(&config).await {
         Ok(output) => {
-            recorder.value(
-                "Sender throughput",
-                Value::Bps(output.iperf.end.sum_sent.bits_per_second),
-            );
-            recorder.value(
-                "Receiver throughput",
-                Value::Bps(output.iperf.end.sum_received.bits_per_second),
-            );
-            recorder.value(
-                "DOWN iperf CPU",
-                Value::Percent(output.iperf.end.cpu_utilization_percent.remote_total),
-            );
-            recorder.value(
-                "UP iperf CPU",
-                Value::Percent(output.iperf.end.cpu_utilization_percent.host_total),
-            );
-            recorder.value(
-                "DOWN GotaTun CPU",
-                Value::Percent(output.alice_gotatun_cpu_percent),
-            );
-            recorder.value(
-                "UP GotaTun CPU",
-                Value::Percent(output.bob_gotatun_cpu_percent),
-            );
+            recorder.measurement(SENDER_THROUGHPUT, output.iperf.end.sum_sent.bits_per_second)?;
+            recorder.measurement(
+                RECEIVER_THROUGHPUT,
+                output.iperf.end.sum_received.bits_per_second,
+            )?;
+            recorder.measurement(
+                DOWN_IPERF_CPU,
+                output.iperf.end.cpu_utilization_percent.remote_total,
+            )?;
+            recorder.measurement(
+                UP_IPERF_CPU,
+                output.iperf.end.cpu_utilization_percent.host_total,
+            )?;
+            recorder.measurement(DOWN_GOTATUN_CPU, output.alice_gotatun_cpu_percent)?;
+            recorder.measurement(UP_GOTATUN_CPU, output.bob_gotatun_cpu_percent)?;
             recorder.success().await
         }
         Err(error) => {

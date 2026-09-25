@@ -20,6 +20,10 @@ The result records sender- and receiver-reported throughput plus process CPU usa
 GotaTun on the outbound (`UP`) and inbound (`DOWN`) paths. CPU percentages are normalized to one
 logical core and may exceed 100% when a process uses multiple cores.
 
+The stable v1 measurement IDs are `throughput.sender`, `throughput.receiver`, `cpu.iperf.up`,
+`cpu.iperf.down`, `cpu.gotatun.up`, and `cpu.gotatun.down`. Display labels are recorded separately
+and may change without breaking a result series.
+
 Configuration is read at runtime:
 
 - `BENCHY_PEER` (default `mole@10.0.0.2`)
