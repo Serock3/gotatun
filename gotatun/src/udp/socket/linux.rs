@@ -30,6 +30,19 @@ use crate::{
 /// Max number of packets/messages for sendmmsg/recvmmsg
 const MAX_PACKET_COUNT: usize = 100;
 
+/// Max bytes in one UDP GSO (`UDP_SEGMENT`) `sendmsg`. The segmented datagram
+/// is a single IP packet, whose total length is limited to 65535 bytes; stay
+/// comfortably below. WireGuard bursts are same-sized MTU-bound packets, so
+/// this caps a GSO run at roughly 40 packets of tunnel-MTU size.
+const MAX_GSO_BYTES: usize = 60_000;
+
+/// Smallest segment size worth GSO'ing. For small segments (e.g. small
+/// iperf-style UDP floods), the extra per-segment work the receiving stack
+/// does in the sender's softirq outweighs the savings of one skb over many:
+/// measured 128-byte UDP throughput dropped ~19% with unbounded GSO, while
+/// MTU-sized TCP segments gain 23-28%. So only GSO substantial segments.
+const MIN_GSO_SEGMENT_BYTES: usize = 1024;
+
 #[derive(Default)]
 pub struct SendmmsgBuf {
     targets: Vec<Option<SockaddrStorage>>,
@@ -53,12 +66,149 @@ impl UdpSend for super::UdpSocket {
         let socket = self.socket();
         let fd = socket.as_raw_fd();
 
-        buf.targets.clear();
+        let mut start = 0;
+        while start < packets.len() {
+            let end = start + gso_run_end(&packets[start..]);
+            let run = &packets[start..end];
 
+            if run.len() >= 2 && self.gso_supported.load(std::sync::atomic::Ordering::Relaxed) {
+                match Self::send_gso_run(socket, fd, run).await {
+                    Ok(()) => {
+                        start = end;
+                        continue;
+                    }
+                    Err(e) if is_gso_unsupported(&e) => {
+                        // Remember this, so we don't retry GSO on every batch.
+                        self.gso_supported
+                            .store(false, std::sync::atomic::Ordering::Relaxed);
+                        tracing::warn!("UDP GSO send failed ({e}); falling back to sendmmsg");
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
+
+            Self::send_run_sendmmsg(socket, fd, buf, run).await?;
+            start = end;
+        }
+        debug_assert!(start == packets.len(), "all packets should be sent");
+        packets.clear();
+
+        Ok(())
+    }
+
+    fn max_number_of_packets_to_send(&self) -> usize {
+        MAX_PACKET_COUNT
+    }
+
+    fn local_addr(&self) -> io::Result<Option<SocketAddr>> {
+        UdpSocket::local_addr(self).map(Some)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn set_fwmark(&self, mark: u32) -> io::Result<()> {
+        setsockopt(self.socket(), sockopt::Mark, &mark)?;
+        Ok(())
+    }
+}
+
+/// Returns the exclusive end of the first UDP GSO-able run in `packets`: a
+/// maximal slice with one destination and one segment size, plus optionally
+/// the packet right after it if it is strictly smaller (the kernel allows the
+/// last segment of a `UDP_SEGMENT` send to be shorter than `gso_size`).
+fn gso_run_end(packets: &[(Packet, SocketAddr)]) -> usize {
+    let (first_packet, first_addr) = &packets[0];
+    let gso_size = first_packet.len();
+    // A segment size that cannot be expressed in UDP_SEGMENT's u16, that alone
+    // busts the single-IP-packet budget, or that is too small to be worth
+    // segmenting in the kernel, cannot be GSO'd.
+    if gso_size < MIN_GSO_SEGMENT_BYTES
+        || gso_size as u64 > u16::MAX as u64
+        || gso_size > MAX_GSO_BYTES
+    {
+        return 1;
+    }
+    let mut total = gso_size;
+    let mut end = 1;
+    while end < packets.len() {
+        let (packet, addr) = &packets[end];
+        if *addr != *first_addr
+            || packet.len() != gso_size
+            || total + gso_size > MAX_GSO_BYTES
+        {
+            break;
+        }
+        total += gso_size;
+        end += 1;
+    }
+    // The kernel allows a single trailing segment smaller than `gso_size`.
+    if end < packets.len() {
+        let (packet, addr) = &packets[end];
+        if *addr == *first_addr && packet.len() < gso_size {
+            end += 1;
+        }
+    }
+    end
+}
+
+/// Errors that mean the platform (or egress route) rejected UDP GSO, so the
+/// whole mechanism is unusable rather than this particular send being wrong.
+fn is_gso_unsupported(err: &io::Error) -> bool {
+    matches!(err.raw_os_error(), Some(libc::EIO) | Some(libc::EINVAL))
+}
+
+impl super::UdpSocket {
+    /// Send `run` (same-size packets to one destination, except possibly a
+    /// shorter last one) as a single `sendmsg` with `UDP_SEGMENT`: the kernel
+    /// splits the total buffer into `gso_size`-sized datagrams, which is one
+    /// skb instead of `run.len()` on the egress path.
+    async fn send_gso_run(
+        socket: &tokio::net::UdpSocket,
+        fd: std::os::fd::RawFd,
+        run: &[(Packet, SocketAddr)],
+    ) -> io::Result<()> {
+        debug_assert!(run.len() >= 2);
+        let gso_size = run[0].0.len();
+        debug_assert!(gso_size > 0, "empty datagrams cannot be GSO'd");
+        let addr = SockaddrStorage::from(run[0].1);
+
+        // The stack array must cover the whole run: `check_send_max_number_of_packets`
+        // caps a batch at MAX_PACKET_COUNT packets, so this cannot overflow.
+        let mut packets_buf = [IoSlice::new(&[]); MAX_PACKET_COUNT];
+        for (slot, (packet, _)) in packets_buf.iter_mut().zip(run.iter()) {
+            *slot = IoSlice::new(&packet[..]);
+        }
+        let pkts = &packets_buf[..run.len()];
+
+        socket
+            .async_io(Interest::WRITABLE, || {
+                nix::sys::socket::sendmsg::<SockaddrStorage>(
+                    fd,
+                    pkts,
+                    &[nix::sys::socket::ControlMessage::UdpGsoSegments(
+                        &(gso_size as u16),
+                    )],
+                    MsgFlags::MSG_DONTWAIT,
+                    Some(&addr),
+                )
+                .map_err(io::Error::from)
+            })
+            .await?;
+        Ok(())
+    }
+
+    /// Send `run` with `sendmmsg`, looping over partial progress. This is the
+    /// pre-GSO implementation, now scoped to one run.
+    async fn send_run_sendmmsg(
+        socket: &tokio::net::UdpSocket,
+        fd: std::os::fd::RawFd,
+        buf: &mut SendmmsgBuf,
+        run: &[(Packet, SocketAddr)],
+    ) -> io::Result<()> {
         // This allocation can't be put in the struct because of lifetimes.
         // So we allocate it on the stack instead.
         let mut packets_buf = [[IoSlice::new(&[])]; MAX_PACKET_COUNT];
-        for ((packet, target), packets_buf) in packets.iter().zip(&mut packets_buf) {
+        buf.targets.clear();
+        for ((packet, target), packets_buf) in run.iter().zip(&mut packets_buf) {
             buf.targets.push(Some(SockaddrStorage::from(*target)));
             *packets_buf = [IoSlice::new(&packet[..])];
         }
@@ -87,22 +237,6 @@ impl UdpSend for super::UdpSocket {
             packet_buf_start += n;
         }
         debug_assert!(packet_buf_start == len, "all packets should be sent");
-        packets.clear();
-
-        Ok(())
-    }
-
-    fn max_number_of_packets_to_send(&self) -> usize {
-        MAX_PACKET_COUNT
-    }
-
-    fn local_addr(&self) -> io::Result<Option<SocketAddr>> {
-        UdpSocket::local_addr(self).map(Some)
-    }
-
-    #[cfg(target_os = "linux")]
-    fn set_fwmark(&self, mark: u32) -> io::Result<()> {
-        setsockopt(self.socket(), sockopt::Mark, &mark)?;
         Ok(())
     }
 }
@@ -381,6 +515,122 @@ mod android {
             buf.truncate(n);
             let src = self.map_src(src);
             Ok((buf, src))
+        }
+    }
+}
+
+#[cfg(test)]
+mod gso_tests {
+    use super::*;
+    use crate::packet::PacketBufPool;
+    use crate::udp::UdpRecv;
+    use std::time::Duration;
+    use tokio::time::timeout;
+
+    /// send_many_to must deliver, as individual datagrams with intact
+    /// payloads and order, a batch of same-size packets to one destination
+    /// followed by one shorter packet - exactly the shape a WireGuard burst
+    /// has. On platforms with UDP GSO this exercises the UDP_SEGMENT path,
+    /// elsewhere the sendmmsg fallback.
+    #[tokio::test]
+    async fn send_many_to_with_trailing_short_packet() {
+        let sender = super::super::UdpSocket::bind(
+            (std::net::Ipv4Addr::LOCALHOST, 0).into(),
+            crate::udp::socket::SockOpt::default(),
+        )
+        .unwrap();
+        let mut receiver = super::super::UdpSocket::bind(
+            (std::net::Ipv4Addr::LOCALHOST, 0).into(),
+            crate::udp::socket::SockOpt::default(),
+        )
+        .unwrap();
+        let dst = receiver.local_addr().unwrap();
+
+        let mut packets = Vec::new();
+        for i in 0..5u8 {
+            let mut b = bytes::BytesMut::zeroed(1400);
+            b[0] = i;
+            packets.push((Packet::from_bytes(b), dst));
+        }
+        let mut short = bytes::BytesMut::zeroed(100);
+        short[0] = 200;
+        packets.push((Packet::from_bytes(short), dst));
+        for i in 6..8u8 {
+            let mut b = bytes::BytesMut::zeroed(1400);
+            b[0] = i;
+            packets.push((Packet::from_bytes(b), dst));
+        }
+
+        let mut buf = Default::default();
+        timeout(Duration::from_secs(10), sender.send_many_to(&mut buf, &mut packets))
+            .await
+            .expect("send completes")
+            .unwrap();
+        assert!(packets.is_empty(), "send_many_to must consume the batch");
+
+        // 5x1400 + trailing 100 forms one GSO run, then a second run of 2x1400
+        // starts after the size break: multiple runs in one call.
+        let mut pool = PacketBufPool::new(8);
+        for i in 0..8u8 {
+            let (packet, src) = timeout(Duration::from_secs(10), receiver.recv_from(&mut pool))
+                .await
+                .expect("datagram arrives")
+                .unwrap();
+            assert_eq!(src, sender.local_addr().unwrap());
+            let (expected_len, expected_first) = if i == 5 { (100, 200) } else { (1400, i) };
+            assert_eq!(packet.len(), expected_len, "datagram {i} must be one segment");
+            assert_eq!(packet[0], expected_first, "datagram {i} must keep its payload and order");
+        }
+    }
+}
+
+#[cfg(test)]
+mod gso_tests_dualstack {
+    use super::*;
+    use crate::packet::PacketBufPool;
+    use crate::udp::UdpRecv;
+    use crate::udp::socket::UdpSocketFactory;
+    use crate::udp::{UdpSend, UdpTransportFactory};
+    use std::time::Duration;
+    use tokio::time::timeout;
+
+    /// Same as gso_tests::send_many_to_with_trailing_short_packet but with the
+    /// production socket setup: factory-bound dual-stack (IPv6) socket with
+    /// UDP GRO enabled, sending to an IPv4 destination.
+    #[tokio::test]
+    async fn send_many_to_gso_dual_stack_socket_to_v4() {
+        let mut factory = UdpSocketFactory::default();
+        let params = crate::udp::UdpTransportFactoryParams {
+            addr: None,
+            port: 0,
+            fwmark: None,
+        };
+        let (sender, _) = factory.bind(&params).await.unwrap();
+        let dst = (std::net::Ipv4Addr::LOCALHOST, 0u16).into();
+        let mut receiver = super::super::UdpSocket::bind(dst, crate::udp::socket::SockOpt::default()).unwrap();
+        let dst = receiver.local_addr().unwrap();
+
+        let mut packets = Vec::new();
+        for i in 0..5u8 {
+            let mut b = bytes::BytesMut::zeroed(1400);
+            b[0] = i;
+            packets.push((Packet::from_bytes(b), dst));
+        }
+
+        let mut buf = Default::default();
+        timeout(Duration::from_secs(10), sender.send_many_to(&mut buf, &mut packets))
+            .await
+            .expect("send completes (may fall back to sendmmsg, but must not hang)")
+            .unwrap();
+
+        let mut pool = PacketBufPool::new(8);
+        for i in 0..5u8 {
+            let (packet, _) = timeout(Duration::from_secs(10), receiver.recv_from(&mut pool))
+                .await
+                .expect("datagram arrives")
+                .unwrap();
+            assert_eq!(packet.len(), 1400);
+            assert_eq!(packet[0], i);
         }
     }
 }
