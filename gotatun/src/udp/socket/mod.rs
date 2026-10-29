@@ -86,6 +86,11 @@ impl UdpTransportFactory for UdpSocketFactory {
 pub struct UdpSocket {
     inner: Arc<tokio::net::UdpSocket>,
     map_ipv4_to_ipv6: bool,
+    /// Set to `false` once the platform rejects a UDP GSO (`UDP_SEGMENT`) send,
+    /// after which [`UdpSend::send_many_to`] stops trying and uses `sendmmsg`
+    /// only. Shared between clones of this socket.
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    gso_supported: Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// Options set on the socket created by [`UdpSocket::bind`].
@@ -158,6 +163,8 @@ impl UdpSocket {
         Ok(Self {
             inner: Arc::new(inner),
             map_ipv4_to_ipv6: addr.is_ipv6() && opts.only_v6 == Some(false),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            gso_supported: Arc::new(std::sync::atomic::AtomicBool::new(true)),
         })
     }
 
