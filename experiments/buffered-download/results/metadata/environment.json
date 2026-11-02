@@ -1,0 +1,26 @@
+{
+  "alice": {
+    "kernel": "6.1.0-47-amd64",
+    "logical_cpus": 8,
+    "cpu_model": "Intel(R) Xeon(R) CPU E3-1240 v6 @ 3.70GHz",
+    "nic_driver": "ixgbe",
+    "nic_mtu": "1500",
+    "nic_speed_mbps": "10000",
+    "nic_duplex": "full",
+    "rmem_max": "212992",
+    "wmem_max": "212992",
+    "cpu_governor": "powersave"
+  },
+  "bob": {
+    "kernel": "6.1.0-47-amd64",
+    "logical_cpus": 8,
+    "cpu_model": "Intel(R) Xeon(R) CPU E3-1240 v6 @ 3.70GHz",
+    "nic_driver": "ixgbe",
+    "nic_mtu": "1500",
+    "nic_speed_mbps": "10000",
+    "nic_duplex": "full",
+    "rmem_max": "212992",
+    "wmem_max": "212992",
+    "cpu_governor": "powersave"
+  }
+}

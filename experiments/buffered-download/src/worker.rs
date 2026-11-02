@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 use crate::{
     Endpoint, Mode, Sender, batch,
     packets::{self, ALICE_TUN, BOB_TUN},
@@ -126,7 +130,7 @@ pub fn sender(args: Sender) -> Result<()> {
         "invalid sender geometry"
     );
     ensure!(
-        args.rate.is_finite() && (0.0..=9.0).contains(&args.rate),
+        args.rate.is_finite() && (args.rate == 0.0 || (0.5..=9.0).contains(&args.rate)),
         "invalid offered rate"
     );
     ensure!(

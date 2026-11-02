@@ -1,0 +1,19 @@
+{
+  "local_tests": {
+    "passed": 3,
+    "scope": [
+      "authenticated fresh packet pools and replay rejection",
+      "datagram boundaries and final partial batch",
+      "unique, duplicate and invalid payload accounting"
+    ]
+  },
+  "clippy": "passed with -D warnings",
+  "smoke": "direct UDP and GotaTun short transfers completed at 1 Gb/s",
+  "ctrl_c": "failed result written; owned endpoint, TUN interface and sender stopped",
+  "occupied_port": "failed result written; unrelated listener preserved; created TUN removed",
+  "global_rmem_max_after": 212992,
+  "global_sysctl_changes": false,
+  "nic_setting_changes": false,
+  "actions_or_bencher_publishing": false,
+  "upstream_or_main_changes": false
+}

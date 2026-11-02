@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "status": "success",
+  "source_sha": "7c12d9d3e365fc4ac262fc64f671d6c7aa1aa57a",
+  "aead_backend": "aws-lc-rs",
+  "cpu_scope": "Alice GotaTun process only; START through receiver drain, including idle tail; CPU seconds/Gbit uses delivered payload",
+  "settings": {
+    "peer": "mole@10.0.0.2",
+    "alice": "10.0.0.1",
+    "bob": "10.0.0.2",
+    "nic": "eno2",
+    "interface": "bgio0",
+    "packets": 100000,
+    "payload": 1200,
+    "batch": 64,
+    "rates": [
+      1.0
+    ],
+    "modes": [
+      "gotatun"
+    ],
+    "repetitions": 1,
+    "endpoint_cpus": null,
+    "receive_buffer_mib": 0,
+    "output": "/home/mole/benchy-experiments/results/normal-buffer-size.json"
+  },
+  "trials": [
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 1.0,
+      "repetition": 1,
+      "sender": {
+        "packets": 100000,
+        "datagram_bytes": 1264,
+        "prepare_seconds": 0.10396758,
+        "send_seconds": 0.959739401,
+        "offered_payload_gbps": 1.0002715310007366,
+        "syscalls": 1563,
+        "partial_sends": 0
+      },
+      "receiver": {
+        "unique": 99950,
+        "duplicates": 0,
+        "invalid": 0,
+        "receive_buffer_bytes": 425984,
+        "kernel_socket_drops": 0,
+        "arrival_span_seconds": 0.953370219
+      },
+      "delivered_payload_gbps": 0.9997713952352364,
+      "delivery_window_seconds": 0.959739401,
+      "payload_per_send_window_gbps": 0.9997713952352364,
+      "loss_percent": 0.04999999999999449,
+      "gotatun_cpu_percent": 35.82470198481703,
+      "cpu_window_seconds": 1.175467023,
+      "gotatun_cpu_seconds_per_payload_gigabit": 0.43887314273756733,
+      "gotatun_outer_socket_drops": 4,
+      "gotatun_receive_buffer_bytes": 425984
+    }
+  ],
+  "error": null
+}

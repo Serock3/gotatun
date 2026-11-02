@@ -9,7 +9,9 @@ Bob establishes a real WireGuard session with Alice, prepares a bounded pool of
 fresh encrypted packets, and waits. Alice starts sampling only after preparation.
 Bob then sends the pool once with `sendmmsg`. Alice runs the ordinary embedded
 GotaTun device (AWS-LC, normal UDP socket/GRO and TUN), and a batched local UDP sink
-counts payload delivered through the kernel. Replay protection and handshakes are
+counts payload delivered through the kernel. Inner IPv4 UDP uses a zero UDP
+checksum (permitted for IPv4); IP headers have valid checksums. This is a custom
+UDP workload, not a reproduction of TCP checksum/ACK processing. Replay protection and handshakes are
 unchanged. The packets cross the physical NICs; routes through localhost are refused.
 
 The direct-UDP control sends datagrams of the same outer UDP size over the same
@@ -42,7 +44,11 @@ lease; sender preparation/start/transmit waits are bounded.
 `--rates` specifies offered **application payload** Gb/s; zero means unpaced. Real
 wire rate is higher because of IP/UDP/WireGuard/Ethernet overhead. `--batch` selects
 1–256 datagrams per send call. `--modes direct` or `--modes gotatun` selects one mode.
-`--endpoint-cpus 0` restricts only Alice's GotaTun process for a sensitivity check.
+`--endpoint-cpus 0` restricts only Alice's GotaTun process for a sensitivity check
+(and affects the runtime's default worker count). `--receive-buffer-mib 8` uses
+`SO_RCVBUFFORCE` on that process's owned socket to bypass a low `rmem_max`, without
+changing the global setting. Zero, the default, retains normal buffer-limit
+behavior. Both the requested and actual kernel buffer sizes are recorded.
 
 ## Interpret results
 
@@ -50,9 +56,14 @@ The JSON is updated after each completed trial, including on failures. Results a
 not automatically published to Bencher. Each trial records:
 
 - Actual offered rate and sending duration, excluding all encryption/preparation.
-- Unique delivered payload / sender duration, loss, duplicates and invalid packets.
+- Unique delivered payload divided by the greater of sender duration and local
+  first-to-last delivery span, plus loss, duplicates and invalid packets. The
+  sender-window-only rate is retained separately. This prevents post-send queue
+  draining from masquerading as higher sustained processing capacity.
 - Payload sink kernel socket drops, its actual receive buffer, and arrival span.
-- GotaTun's outer socket drops, including its normal IPv6 dual-stack socket.
+- GotaTun's outer socket drops and actual receive-buffer size, including its
+  normal IPv6 dual-stack socket. Drop counters at different stack layers need not
+  count the same units, especially with GRO; do not subtract them to assign loss.
 - GotaTun process CPU over START through the receiver drain (including a short idle
   tail), its sampling window, and CPU seconds per delivered Gbit. The latter avoids
   the idle tail diluting the reported CPU cost; process CPU accounting has tick
@@ -72,3 +83,17 @@ as a stable capacity benchmark. Very short trains exaggerate startup/drain effec
 Unit/integration tests cover authenticated packet generation, unique counters and
 replay rejection, batched datagram boundaries, and receiver duplicate/invalid-data
 accounting. Socket tests require a normal Linux environment (no root required).
+
+## Results and analysis
+
+See [RESULTS.md](RESULTS.md) for the first Alice/Bob studies and limitations. Raw
+studies and environment/validation metadata are retained under `results/`. Rebuild
+the table and CSV with Python's standard library:
+
+```bash
+python3 analyze.py results/*.json --csv results/summary.csv
+```
+
+The displayed spread is sample standard deviation across complete packet trains,
+not across one-second intervals. The script recomputes the same delivery-window
+definition for the initial and refined experimental report versions.
