@@ -19,7 +19,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::TcpStream,
 };
 
@@ -317,14 +317,16 @@ async fn trial(
             None
         };
         control.write_all(b"STARTv1\n").await?;
-        let mut report = Vec::new();
-        tokio::time::timeout(
-            Duration::from_secs(65),
-            control.take(64 * 1024).read_to_end(&mut report),
-        )
-        .await
-        .context("sender timed out")??;
-        let sender: SendReport = serde_json::from_slice(&report).context("sender report")?;
+        let mut report = String::new();
+        let mut reader = BufReader::new(control);
+        tokio::time::timeout(Duration::from_secs(65), reader.read_line(&mut report))
+            .await
+            .context("sender timed out")??;
+        ensure!(report.len() < 64 * 1024, "sender report too large");
+        let mut control = reader.into_inner();
+        control.shutdown().await?;
+        drop(control);
+        let sender: SendReport = serde_json::from_str(&report).context("sender report")?;
         ensure!(
             sender.packets == args.packets as usize,
             "incomplete packet train"

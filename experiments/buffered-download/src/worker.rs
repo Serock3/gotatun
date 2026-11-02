@@ -140,7 +140,15 @@ pub fn sender(args: Sender) -> Result<()> {
         args.rate,
     )?;
     serde_json::to_writer(&mut client, &report)?;
+    client.write_all(b"\n")?;
     client.flush()?;
+    // Let Alice actively close the control connection, so Bob's listening port
+    // does not enter TIME_WAIT and block a subsequent experiment.
+    let mut end = [0u8; 1];
+    ensure!(
+        client.read(&mut end)? == 0,
+        "unexpected trailing controller command"
+    );
     Ok(())
 }
 
