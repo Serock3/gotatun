@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "direction": "upload",
+  "status": "success",
+  "source_sha": "2c9aea30eaf9277b83a05f398a5b9b60583a4f89",
+  "settings": {
+    "peer": "mole@10.0.0.2",
+    "alice": "10.0.0.1",
+    "bob": "10.0.0.2",
+    "nic": "eno2",
+    "interface": "bgio0",
+    "packets": 100000,
+    "payload": 1200,
+    "batch": 64,
+    "rates": [
+      1.0
+    ],
+    "modes": [
+      "direct",
+      "gotatun"
+    ],
+    "repetitions": 1,
+    "endpoint_cpus": null,
+    "receive_buffer_mib": 0,
+    "output": "/home/mole/benchy-experiments/results/upload-smoke.json"
+  },
+  "trials": [
+    {
+      "mode": "direct",
+      "requested_payload_gbps": 1.0,
+      "repetition": 1,
+      "offered": {
+        "packets": 100000,
+        "datagram_bytes": 1264,
+        "prepare_seconds": 0.016159708,
+        "send_seconds": 0.959750662,
+        "offered_payload_gbps": 1.0002597945590164,
+        "syscalls": 1563,
+        "partial_sends": 0
+      },
+      "local_output": null,
+      "local_output_payload_gbps": 1.0002597945590164,
+      "cpu_percent": null,
+      "cpu_window_seconds": null,
+      "cpu_seconds_per_output_gigabit": null,
+      "peer_drain": {
+        "packets": 100000,
+        "duplicates": 0,
+        "invalid": 0,
+        "socket_drops": 0,
+        "receive_buffer_bytes": 425984,
+        "probe_authenticated": false
+      },
+      "nic_delta": {
+        "tx_packets": 100000,
+        "tx_bytes": 130600000,
+        "tx_dropped": 0,
+        "tx_errors": 0
+      }
+    },
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 1.0,
+      "repetition": 1,
+      "offered": {
+        "packets": 100000,
+        "datagram_bytes": 1200,
+        "prepare_seconds": 0.015571769,
+        "send_seconds": 0.959725734,
+        "offered_payload_gbps": 1.000285775394244,
+        "syscalls": 1563,
+        "partial_sends": 0
+      },
+      "local_output": {
+        "packets": 100000,
+        "datagram_bytes": 1264,
+        "send_span_seconds": 0.959456662,
+        "transport_error": false
+      },
+      "local_output_payload_gbps": 1.000285775394244,
+      "cpu_percent": 41.97156046635985,
+      "cpu_window_seconds": 1.168489746,
+      "cpu_seconds_per_output_gigabit": 0.5108681044641715,
+      "peer_drain": {
+        "packets": 100000,
+        "duplicates": 0,
+        "invalid": 0,
+        "socket_drops": 0,
+        "receive_buffer_bytes": 425984,
+        "probe_authenticated": true
+      },
+      "nic_delta": {
+        "tx_packets": 100000,
+        "tx_bytes": 130600000,
+        "tx_dropped": 0,
+        "tx_errors": 0
+      }
+    }
+  ],
+  "error": null
+}

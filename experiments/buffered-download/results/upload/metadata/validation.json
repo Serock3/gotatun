@@ -1,0 +1,16 @@
+{
+  "local_tests_passed": 5,
+  "clippy": "passed with -D warnings",
+  "smoke": {"input_packets": 100000, "local_output_packets": 100000, "nic_tx_packets": 100000, "peer_received": 100000},
+  "nic_matches_local_output_in_every_saved_trial": true,
+  "nic_tx_errors_and_drops": 0,
+  "long_kernel_drop_peer_received_datagrams": 0,
+  "cancel_cleanup_seconds": 0.694,
+  "cancel_cleanup": "generator, endpoint, TUN and peer stopped",
+  "occupied_port": "failed result; preserved unrelated listener; no TUN left",
+  "global_rmem_max_after": 212992,
+  "global_sysctl_changes": false,
+  "nic_setting_changes": false,
+  "experiment_in_actions_or_bencher": false,
+  "upstream_or_main_changes": false
+}

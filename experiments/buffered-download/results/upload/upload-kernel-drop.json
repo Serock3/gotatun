@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "direction": "upload",
+  "status": "success",
+  "source_sha": "d3dd50ab2fd492c5f65733ee575225623dc62b46",
+  "settings": {
+    "peer": "mole@10.0.0.2",
+    "alice": "10.0.0.1",
+    "bob": "10.0.0.2",
+    "nic": "eno2",
+    "interface": "bgio0",
+    "packets": 1000000,
+    "payload": 1200,
+    "batch": 64,
+    "rates": [
+      0.0
+    ],
+    "modes": [
+      "gotatun"
+    ],
+    "repetitions": 3,
+    "input_loops": 10,
+    "peer_kernel_drop": true,
+    "endpoint_cpus": null,
+    "receive_buffer_mib": 0,
+    "output": "/home/mole/benchy-experiments/results/upload-kernel-drop.json"
+  },
+  "trials": [
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 0.0,
+      "repetition": 1,
+      "offered": {
+        "packets": 10000000,
+        "datagram_bytes": 1200,
+        "prepare_seconds": 0.114050505,
+        "send_seconds": 11.707741434999999,
+        "offered_payload_gbps": 8.199702780675564,
+        "syscalls": 156250,
+        "partial_sends": 0
+      },
+      "local_output": {
+        "packets": 4058363,
+        "datagram_bytes": 1264,
+        "send_span_seconds": 11.719772779,
+        "transport_error": false
+      },
+      "local_output_payload_gbps": 3.3243208323808746,
+      "cpu_percent": 259.09721841404297,
+      "cpu_window_seconds": 12.023545198,
+      "cpu_seconds_per_output_gigabit": 0.7996007042220913,
+      "peer_drain": {
+        "kernel_drop": true,
+        "received_datagrams": 0,
+        "packets": 0,
+        "duplicates": 0,
+        "invalid": 0,
+        "socket_drops": 4058180,
+        "receive_buffer_bytes": 425984,
+        "probe_authenticated": true
+      },
+      "nic_delta": {
+        "tx_packets": 4058363,
+        "tx_bytes": 5300222078,
+        "tx_dropped": 0,
+        "tx_errors": 0
+      }
+    },
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 0.0,
+      "repetition": 2,
+      "offered": {
+        "packets": 10000000,
+        "datagram_bytes": 1200,
+        "prepare_seconds": 0.114608406,
+        "send_seconds": 11.088567257,
+        "offered_payload_gbps": 8.657565740911842,
+        "syscalls": 156250,
+        "partial_sends": 0
+      },
+      "local_output": {
+        "packets": 3862831,
+        "datagram_bytes": 1264,
+        "send_span_seconds": 11.102307521,
+        "transport_error": false
+      },
+      "local_output_payload_gbps": 3.3401324481291135,
+      "cpu_percent": 256.19835658979366,
+      "cpu_window_seconds": 11.398455705,
+      "cpu_seconds_per_output_gigabit": 0.7874906651156448,
+      "peer_drain": {
+        "kernel_drop": true,
+        "received_datagrams": 0,
+        "packets": 0,
+        "duplicates": 0,
+        "invalid": 0,
+        "socket_drops": 3862648,
+        "receive_buffer_bytes": 425984,
+        "probe_authenticated": true
+      },
+      "nic_delta": {
+        "tx_packets": 3862831,
+        "tx_bytes": 5044857286,
+        "tx_dropped": 0,
+        "tx_errors": 0
+      }
+    },
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 0.0,
+      "repetition": 3,
+      "offered": {
+        "packets": 10000000,
+        "datagram_bytes": 1200,
+        "prepare_seconds": 0.116006278,
+        "send_seconds": 11.581339046,
+        "offered_payload_gbps": 8.289196924353647,
+        "syscalls": 156250,
+        "partial_sends": 0
+      },
+      "local_output": {
+        "packets": 4083172,
+        "datagram_bytes": 1264,
+        "send_span_seconds": 11.585770932,
+        "transport_error": false
+      },
+      "local_output_payload_gbps": 3.383326964607382,
+      "cpu_percent": 265.0998877944881,
+      "cpu_window_seconds": 11.792796606,
+      "cpu_seconds_per_output_gigabit": 0.7975491279190693,
+      "peer_drain": {
+        "kernel_drop": true,
+        "received_datagrams": 0,
+        "packets": 0,
+        "duplicates": 0,
+        "invalid": 0,
+        "socket_drops": 4082989,
+        "receive_buffer_bytes": 425984,
+        "probe_authenticated": true
+      },
+      "nic_delta": {
+        "tx_packets": 4083172,
+        "tx_bytes": 5332622632,
+        "tx_dropped": 0,
+        "tx_errors": 0
+      }
+    }
+  ],
+  "error": null
+}

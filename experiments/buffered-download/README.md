@@ -97,3 +97,35 @@ python3 analyze.py results/*.json --csv results/summary.csv
 The displayed spread is sample standard deviation across complete packet trains,
 not across one-second intervals. The script recomputes the same delivery-window
 definition for the initial and refined experimental report versions.
+
+## Upload counterpart
+
+The `upload` command measures Alice's local encrypted output while Bob discards
+data. It is a separate experiment on `experiment/raw-upload`; see
+[UPLOAD-RESULTS.md](UPLOAD-RESULTS.md) for the method, observations and limitations.
+It leaves the normal iperf benchmarks unchanged.
+
+```bash
+./target/release/gotatun-buffered-download upload \
+  --modes gotatun --rates 0 --input-loops 10 --repetitions 3 \
+  --peer-kernel-drop --output results/upload/kernel-drop.json
+```
+
+Bob validates an authenticated, checksum-checked probe before measurement, then
+never decrypts data. Normally he drains raw UDP; `--peer-kernel-drop` instead keeps
+the port open but stops reading, so his kernel drops traffic once the socket queue
+fills. Alice's primary metric uses her local transport counter, cross-checked with
+her NIC, and never uses Bob's received-packet count.
+
+`--input-loops` repeats plaintext, with fresh encryption/nonces for every outgoing
+WireGuard packet. It is refused for encrypted download pools. The generator has a
+60-second deadline and a cooperative stop flag so it stops before TUN cleanup on
+cancellation. Paced trains whose expected duration exceeds 55 seconds are refused.
+The default output filename is now `buffered-io.json`; use explicit output paths
+when comparing conditions.
+
+Summarize saved upload studies separately from download studies:
+
+```bash
+python3 analyze-upload.py results/upload/upload-*.json --csv results/upload/summary.csv
+```

@@ -2,9 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! Experimental real-NIC receive workload; deliberately outside the default Benchy suite.
+//! Experimental real-NIC I/O workloads; deliberately outside the default Benchy suite.
 #[cfg(not(target_os = "linux"))]
-compile_error!("the buffered download experiment requires Linux");
+compile_error!("the real-network I/O experiments require Linux");
 
 mod batch;
 mod outgoing;

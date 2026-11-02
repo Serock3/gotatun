@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "direction": "upload",
+  "status": "success",
+  "source_sha": "2c9aea30eaf9277b83a05f398a5b9b60583a4f89",
+  "settings": {
+    "peer": "mole@10.0.0.2",
+    "alice": "10.0.0.1",
+    "bob": "10.0.0.2",
+    "nic": "eno2",
+    "interface": "bgio0",
+    "packets": 1000000,
+    "payload": 1200,
+    "batch": 64,
+    "rates": [
+      0.0
+    ],
+    "modes": [
+      "gotatun"
+    ],
+    "repetitions": 3,
+    "endpoint_cpus": "0",
+    "receive_buffer_mib": 0,
+    "output": "/home/mole/benchy-experiments/results/upload-one-cpu.json"
+  },
+  "trials": [
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 0.0,
+      "repetition": 1,
+      "offered": {
+        "packets": 1000000,
+        "datagram_bytes": 1200,
+        "prepare_seconds": 0.115105076,
+        "send_seconds": 1.443634992,
+        "offered_payload_gbps": 6.649880373639488,
+        "syscalls": 15625,
+        "partial_sends": 0
+      },
+      "local_output": {
+        "packets": 219560,
+        "datagram_bytes": 1264,
+        "send_span_seconds": 1.46084764,
+        "transport_error": false
+      },
+      "local_output_payload_gbps": 1.442844511834239,
+      "cpu_percent": 83.37332959435548,
+      "cpu_window_seconds": 1.752018315,
+      "cpu_seconds_per_output_gigabit": 0.6930129218277575,
+      "peer_drain": {
+        "packets": 219560,
+        "duplicates": 0,
+        "invalid": 0,
+        "socket_drops": 0,
+        "receive_buffer_bytes": 425984,
+        "probe_authenticated": true
+      },
+      "nic_delta": {
+        "tx_packets": 219560,
+        "tx_bytes": 286745360,
+        "tx_dropped": 0,
+        "tx_errors": 0
+      }
+    },
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 0.0,
+      "repetition": 2,
+      "offered": {
+        "packets": 1000000,
+        "datagram_bytes": 1200,
+        "prepare_seconds": 0.114615238,
+        "send_seconds": 1.432257412,
+        "offered_payload_gbps": 6.70270575635883,
+        "syscalls": 15625,
+        "partial_sends": 0
+      },
+      "local_output": {
+        "packets": 219624,
+        "datagram_bytes": 1264,
+        "send_span_seconds": 1.449327053,
+        "transport_error": false
+      },
+      "local_output_payload_gbps": 1.4547374905034636,
+      "cpu_percent": 82.49201058862407,
+      "cpu_window_seconds": 1.746553284,
+      "cpu_seconds_per_output_gigabit": 0.6833492127327279,
+      "peer_drain": {
+        "packets": 219624,
+        "duplicates": 0,
+        "invalid": 0,
+        "socket_drops": 0,
+        "receive_buffer_bytes": 425984,
+        "probe_authenticated": true
+      },
+      "nic_delta": {
+        "tx_packets": 219624,
+        "tx_bytes": 286828944,
+        "tx_dropped": 0,
+        "tx_errors": 0
+      }
+    },
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 0.0,
+      "repetition": 3,
+      "offered": {
+        "packets": 1000000,
+        "datagram_bytes": 1200,
+        "prepare_seconds": 0.115353046,
+        "send_seconds": 0.953065268,
+        "offered_payload_gbps": 10.072762403928037,
+        "syscalls": 15625,
+        "partial_sends": 0
+      },
+      "local_output": {
+        "packets": 222736,
+        "datagram_bytes": 1264,
+        "send_span_seconds": 0.968501569,
+        "transport_error": false
+      },
+      "local_output_payload_gbps": 2.2078080908096083,
+      "cpu_percent": 76.78183834501678,
+      "cpu_window_seconds": 1.264221174,
+      "cpu_seconds_per_output_gigabit": 0.45396243485568555,
+      "peer_drain": {
+        "packets": 222736,
+        "duplicates": 0,
+        "invalid": 0,
+        "socket_drops": 0,
+        "receive_buffer_bytes": 425984,
+        "probe_authenticated": true
+      },
+      "nic_delta": {
+        "tx_packets": 222736,
+        "tx_bytes": 290893216,
+        "tx_dropped": 0,
+        "tx_errors": 0
+      }
+    }
+  ],
+  "error": null
+}
