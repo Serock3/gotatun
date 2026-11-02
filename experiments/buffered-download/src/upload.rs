@@ -426,6 +426,8 @@ async fn trial(
         let pid = if mode == Mode::Gotatun {
             let mut values = vec![
                 "endpoint".into(),
+                "--receive-buffer-mib".into(),
+                args.receive_buffer_mib.to_string(),
                 "--private-key".into(),
                 hex::encode(private.to_bytes()),
                 "--peer-public-key".into(),
@@ -522,7 +524,7 @@ async fn trial(
             } else {
                 args.alice
             },
-            0,
+            if mode == Mode::Direct { PORT } else { 0 },
         ))?;
         socket.connect(SocketAddrV4::new(
             if mode == Mode::Gotatun {
