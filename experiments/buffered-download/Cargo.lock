@@ -707,6 +707,7 @@ name = "gotatun-buffered-download"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64",
  "benchy-runner",
  "bytes",
  "clap",

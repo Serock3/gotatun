@@ -10,6 +10,7 @@ publish = false
 
 [dependencies]
 anyhow = "1.0"
+base64 = "0.22.1"
 benchy-runner = { path = "../../../benchy/benchy-runner" }
 bytes = "1.11"
 clap = { version = "4.5", features = ["derive"] }

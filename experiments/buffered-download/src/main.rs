@@ -8,6 +8,7 @@ compile_error!("the real-network I/O experiments require Linux");
 
 mod batch;
 mod capacity;
+mod kernel_tcp;
 mod outgoing;
 mod packets;
 mod run;
@@ -34,6 +35,11 @@ enum Command {
     Run(Run),
     /// Search a paced download rate within a packet-loss budget (one selected mode).
     Capacity(Capacity),
+    /// Compare TCP downloads using kernel WireGuard or GotaTun peers.
+    KernelTcp(kernel_tcp::Settings),
+    /// Internal leased kernel WireGuard endpoint, with cleanup on shutdown.
+    #[command(hide = true)]
+    KernelEndpoint(Endpoint),
     Upload(Run),
     Drain(upload::DrainArgs),
     Endpoint(Endpoint),
@@ -110,6 +116,9 @@ struct Capacity {
 
 #[derive(Args)]
 struct Endpoint {
+    /// Use Bob's tunnel address and Alice as the allowed peer.
+    #[arg(long)]
+    bob: bool,
     #[arg(long)]
     send_report: Option<PathBuf>,
     #[arg(long, default_value_t = 0)]
@@ -159,6 +168,8 @@ async fn main() -> Result<()> {
     match Cli::parse().command {
         Command::Run(args) => run::run(args).await,
         Command::Capacity(args) => run::capacity(args).await,
+        Command::KernelTcp(args) => kernel_tcp::run(args).await,
+        Command::KernelEndpoint(args) => kernel_tcp::endpoint(args).await,
         Command::Upload(args) => upload::run(args).await,
         Command::Drain(args) => tokio::task::spawn_blocking(|| upload::drain(args)).await?,
         Command::Endpoint(args) => worker::endpoint(args).await,

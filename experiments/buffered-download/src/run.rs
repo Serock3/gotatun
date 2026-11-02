@@ -315,19 +315,35 @@ pub(crate) fn validate(args: &Run) -> Result<()> {
 }
 
 pub(crate) async fn verify_physical_route(args: &Run) -> Result<()> {
-    let local = checked_output("ip", ["-j", "route", "get", &args.bob.to_string()]).await?;
+    verify_underlay(
+        &args.peer,
+        args.alice,
+        args.bob,
+        &args.nic,
+        wire_len(args.payload as usize) as u64 + 28,
+    )
+    .await
+}
+
+pub(crate) async fn verify_underlay(
+    peer: &str,
+    alice: Ipv4Addr,
+    bob: Ipv4Addr,
+    nic: &str,
+    minimum_mtu: u64,
+) -> Result<()> {
+    ensure!(
+        alice != bob && !alice.is_loopback() && !bob.is_loopback(),
+        "use two physical hosts"
+    );
+    let local = checked_output("ip", ["-j", "route", "get", &bob.to_string()]).await?;
     let remote = checked_output(
         "ssh",
         [
-            &args.peer,
+            peer,
             &remote_command(
                 "ip",
-                &[
-                    "-j".into(),
-                    "route".into(),
-                    "get".into(),
-                    args.alice.to_string(),
-                ],
+                &["-j".into(), "route".into(), "get".into(), alice.to_string()],
             ),
         ],
     )
@@ -335,14 +351,12 @@ pub(crate) async fn verify_physical_route(args: &Run) -> Result<()> {
     for output in [local, remote] {
         let routes: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
         ensure!(
-            routes.first().and_then(|r| r["dev"].as_str()) == Some(args.nic.as_str()),
+            routes.first().and_then(|r| r["dev"].as_str()) == Some(nic),
             "both underlay routes must use {}",
-            args.nic
+            nic
         );
     }
-    let device = PathBuf::from("/sys/class/net")
-        .join(&args.nic)
-        .join("device");
+    let device = PathBuf::from("/sys/class/net").join(nic).join("device");
     ensure!(
         device.exists(),
         "controller's selected NIC has no physical device"
@@ -351,7 +365,7 @@ pub(crate) async fn verify_physical_route(args: &Run) -> Result<()> {
         .trim()
         .parse()?;
     ensure!(
-        mtu >= wire_len(args.payload as usize) as u64 + 28,
+        mtu >= minimum_mtu,
         "underlay MTU would fragment the test datagrams"
     );
     Ok(())

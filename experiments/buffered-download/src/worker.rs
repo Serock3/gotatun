@@ -78,6 +78,11 @@ pub fn key(value: &str) -> Result<[u8; 32]> {
 }
 
 pub async fn endpoint(args: Endpoint) -> Result<()> {
+    let (local_tun, peer_tun) = if args.bob {
+        (BOB_TUN, ALICE_TUN)
+    } else {
+        (ALICE_TUN, BOB_TUN)
+    };
     let counters = Arc::new(crate::outgoing::Counters::new(args.data_wire_len));
     ensure!(
         args.receive_buffer_mib <= 64,
@@ -91,7 +96,7 @@ pub async fn endpoint(args: Endpoint) -> Result<()> {
     );
     let peer = Peer::new(PublicKey::from(key(&args.peer_public_key)?))
         .with_endpoint(args.peer.into())
-        .with_allowed_ip(format!("{BOB_TUN}/32").parse::<ipnetwork::IpNetwork>()?);
+        .with_allowed_ip(format!("{peer_tun}/32").parse::<ipnetwork::IpNetwork>()?);
     let mut device = DeviceBuilder::new()
         .with_private_key(StaticSecret::from(key(&args.private_key)?))
         .with_peer(peer)
@@ -110,7 +115,7 @@ pub async fn endpoint(args: Endpoint) -> Result<()> {
             [
                 "address",
                 "add",
-                &format!("{ALICE_TUN}/24"),
+                &format!("{local_tun}/24"),
                 "dev",
                 &args.interface,
             ],

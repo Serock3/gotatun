@@ -151,6 +151,36 @@ The displayed spread is sample standard deviation across complete packet trains,
 not across one-second intervals. The script recomputes the same delivery-window
 definition for the initial and refined experimental report versions.
 
+## Kernel-peer TCP comparison
+
+The optional `kernel-tcp` command compares Alice/Bob endpoint implementations:
+kernel/kernel (sender-headroom control), GotaTun/kernel, and GotaTun/GotaTun.
+Every case uses the same physical link, 1440-byte tunnel MTU, one TCP stream and
+iperf settings. Alice initiates iperf with `--reverse` and reports her received
+throughput. Fresh peers are created for every trial, and case order rotates
+between repetitions. Both hosts need `wg` (wireguard-tools) and kernel WireGuard.
+
+```bash
+./target/release/gotatun-buffered-download kernel-tcp \
+  --duration 30 --warmup 3 --repetitions 5 \
+  --output results/kernel-tcp/comparison.json
+```
+
+`--cases kernel-kernel,gotatun-kernel` selects a subset. Full client JSON,
+including receiver intervals, is retained per trial. The primary throughput is
+Alice's receiver summary, excluding iperf's omitted warmup. GotaTun process CPU
+is collected only on Alice and spans the entire iperf invocation, including
+connection setup and warmup; this scope is explicitly recorded. No process CPU
+is attributed to the kernel endpoint's idle helper. Server TCP retransmission
+counts, when available in the client JSON, are diagnostic only.
+
+Kernel helpers configure keys through `wg setconf ... /dev/stdin`, create only a
+previously absent experiment interface, and delete it on shutdown or lease expiry
+(120 seconds). The controller additionally checks the ownership alias after
+stopping helpers, removing a leftover interface only if it matches that helper's
+PID. No persistent WireGuard config or key files, global sysctls, NIC changes,
+Actions/Bencher integration, or changes to default benchmarks are introduced.
+
 ## Upload counterpart
 
 The `upload` command measures Alice's local encrypted output while Bob discards
