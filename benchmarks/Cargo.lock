@@ -716,6 +716,7 @@ name = "gotatun-benchmark-common"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64",
  "benchy-lib",
  "benchy-runner",
  "clap",
@@ -723,6 +724,7 @@ dependencies = [
  "hex",
  "ipnetwork",
  "rand",
+ "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",

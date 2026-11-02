@@ -31,6 +31,8 @@ use tokio::{
 
 pub use benchy_runner::Direction;
 
+mod kernel_peer;
+
 fn benchmark_name(direction: Direction) -> &'static str {
     match direction {
         Direction::Upload => "gotatun-upload",
@@ -56,6 +58,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Endpoint(EndpointArgs),
+    KernelPeer(kernel_peer::Args),
 }
 
 #[derive(Args, Clone)]
@@ -91,6 +94,7 @@ struct ControllerConfig {
     listen_port: u16,
     iperf_port: u16,
     duration: u64,
+    warmup: u64,
     mtu: u16,
 }
 
@@ -107,14 +111,17 @@ pub async fn run(direction: Direction) -> Result<()> {
         .init();
 
     let cli = Cli::parse();
-    if let Some(Commands::Endpoint(args)) = cli.command {
-        return run_endpoint(args).await;
+    if let Some(command) = cli.command {
+        return match command {
+            Commands::Endpoint(args) => run_endpoint(args).await,
+            Commands::KernelPeer(args) => kernel_peer::run(args).await,
+        };
     }
 
     let definition = BenchmarkDefinition {
         repository: "gotatun",
         name: benchmark_name(direction),
-        description: "TCP throughput and CPU usage measured on Alice",
+        description: "TCP throughput and CPU on Alice against a kernel WireGuard peer",
     };
     let output = cli
         .output
@@ -126,7 +133,12 @@ pub async fn run(direction: Direction) -> Result<()> {
             (1..=120).contains(&config.duration),
             "BENCHY_DURATION must be 1–120 seconds"
         );
+        anyhow::ensure!(config.warmup <= 30, "BENCHY_WARMUP must be 0–30 seconds");
+        kernel_peer::validate_interface(&config.interface)?;
         recorder.parameter("duration_seconds", config.duration);
+        recorder.parameter("warmup_seconds", config.warmup);
+        recorder.parameter("peer_implementation", "linux-wireguard");
+        recorder.parameter("cpu_scope", "Alice GotaTun process during the full iperf invocation, including setup and omitted warmup");
         recorder.parameter("mtu", config.mtu);
         recorder.parameter("listen_port", config.listen_port);
         recorder.parameter("direction", direction.name());
@@ -170,6 +182,7 @@ fn controller_config() -> Result<ControllerConfig> {
         listen_port: env_value("BENCHY_WIREGUARD_PORT", "51821").parse()?,
         iperf_port: env_value("BENCHY_IPERF_PORT", "5201").parse()?,
         duration: env_value("BENCHY_DURATION", "30").parse()?,
+        warmup: env_value("BENCHY_WARMUP", "3").parse()?,
         mtu: env_value("BENCHY_MTU", "1440").parse()?,
     })
 }
@@ -195,7 +208,7 @@ async fn run_controller(
         peer_tunnel_address: Ipv4Addr::new(10, 0, 1, 2),
         listen_port: config.listen_port,
         mtu: config.mtu,
-        lease_seconds: config.duration + 120,
+        lease_seconds: config.duration + config.warmup + 120,
     };
     let remote_args = EndpointArgs {
         private_key: hex::encode(bob_private.to_bytes()),
@@ -208,8 +221,10 @@ async fn run_controller(
 
     let executable = env::current_exe().context("failed to locate benchmark executable")?;
     let run_id = env::var("GITHUB_RUN_ID").unwrap_or_else(|_| std::process::id().to_string());
-    let remote_dir = format!("/tmp/benchy-{run_id}");
+    let remote_dir = format!("/tmp/benchy-{run_id}-{:016x}", rand::random::<u64>());
     let remote_executable = format!("{remote_dir}/gotatun-throughput");
+    let peer_owner = format!("benchy-kernel-{:016x}", rand::random::<u64>());
+    let mut peer_attempted = false;
     let mut processes: Vec<Process> = Vec::new();
     let result = async {
         deploy(&config.peer, &executable, &remote_dir, &remote_executable).await?;
@@ -222,9 +237,10 @@ async fn run_controller(
                 .await?,
         );
         let local_pid = processes.last().unwrap().pid();
+        peer_attempted = true;
         processes.push(
             Process::command(&remote_executable)
-                .args(endpoint_args(&remote_args))
+                .args(kernel_peer::command_args(&remote_args, &peer_owner))
                 .on_peer(&config.peer)
                 .sudo()
                 .ready_when(READY_MARKER)
@@ -262,6 +278,8 @@ async fn run_controller(
             &config.iperf_port.to_string(),
             "--time",
             &config.duration.to_string(),
+            "--omit",
+            &config.warmup.to_string(),
             "--json",
             "--interval",
             "1",
@@ -270,7 +288,7 @@ async fn run_controller(
             client.arg("--reverse");
         }
         let output = timeout(
-            Duration::from_secs(config.duration + 30),
+            Duration::from_secs(config.duration + config.warmup + 30),
             client.kill_on_drop(true).output(),
         )
         .await
@@ -294,6 +312,12 @@ async fn run_controller(
     };
     let cleanup = benchy_runner::process::stop_all(&mut processes).await;
     let result = benchy_runner::process::with_cleanup(result, cleanup);
+    let cleanup = if peer_attempted {
+        kernel_peer::cleanup(&config.peer, &config.interface, &peer_owner).await
+    } else {
+        Ok(())
+    };
+    let result = benchy_runner::process::with_cleanup(result, cleanup);
     let cleanup = checked_output(
         "ssh",
         [
@@ -307,6 +331,7 @@ async fn run_controller(
 }
 
 async fn run_endpoint(args: EndpointArgs) -> Result<()> {
+    kernel_peer::ensure_absent(&args.interface).await?;
     let private_key = StaticSecret::from(decode_key(&args.private_key)?);
     let public_key = PublicKey::from(decode_key(&args.peer_public_key)?);
     let preshared_key = decode_key(&args.preshared_key)?;
@@ -373,7 +398,10 @@ async fn deploy(
 ) -> Result<()> {
     checked_output(
         "ssh",
-        [peer, &format!("mkdir -p {}", shell_quote(remote_dir))],
+        [
+            peer,
+            &format!("umask 077; mkdir {}", shell_quote(remote_dir)),
+        ],
     )
     .await?;
     checked_output(
