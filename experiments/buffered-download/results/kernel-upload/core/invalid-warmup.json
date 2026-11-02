@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "repository": "gotatun",
+  "name": "gotatun-upload",
+  "commit": "1c1e3138dd8dbc2e19af3b2348e2e0149cab8d45",
+  "branch": "validation/kernel-peer-core",
+  "commit_message": "Use a leased kernel WireGuard peer for throughput benchmarks",
+  "description": "TCP throughput and CPU on Alice against a kernel WireGuard peer",
+  "date": "2026-11-02T23:26:11.235384953Z",
+  "measurements": {},
+  "status": "failed",
+  "error": "BENCHY_WARMUP must be 0–30 seconds"
+}

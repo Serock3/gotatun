@@ -35,7 +35,7 @@ enum Command {
     Run(Run),
     /// Search a paced download rate within a packet-loss budget (one selected mode).
     Capacity(Capacity),
-    /// Compare TCP downloads using kernel WireGuard or GotaTun peers.
+    /// Compare TCP traffic using kernel WireGuard or GotaTun peers.
     KernelTcp(kernel_tcp::Settings),
     /// Internal leased kernel WireGuard endpoint, with cleanup on shutdown.
     #[command(hide = true)]

@@ -1,0 +1,7 @@
+{
+  "invalid_warmup_failed_before_setup": true,
+  "existing_peer_interface_preserved": true,
+  "interruption_recorded_as_failure": true,
+  "peer_interface_absent_after_interruption": true,
+  "alice_interface_absent_after_interruption": true
+}

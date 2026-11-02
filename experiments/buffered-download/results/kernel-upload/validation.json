@@ -1,0 +1,26 @@
+{
+  "experiment_source_sha": "f55b3d865b4e452777bd553c8f3472557e4387b5",
+  "experiment_trials_validated": 15,
+  "experimental_unit_tests_passed": 8,
+  "core_tests_and_clippy_passed": true,
+  "hotpath_stack_tests_and_clippy_passed": true,
+  "dial9_stack_build_checks_passed": true,
+  "integrated_artifacts": {
+    "upload": {
+      "source_sha": "1c1e3138dd8dbc2e19af3b2348e2e0149cab8d45",
+      "throughput_gbps": 4.624114685851375
+    },
+    "download": {
+      "source_sha": "1c1e3138dd8dbc2e19af3b2348e2e0149cab8d45",
+      "throughput_gbps": 2.6578189976476696
+    }
+  },
+  "integrated_failure_checks": {
+    "invalid_warmup_failed_before_setup": true,
+    "existing_peer_interface_preserved": true,
+    "interruption_recorded_as_failure": true,
+    "peer_interface_absent_after_interruption": true,
+    "alice_interface_absent_after_interruption": true
+  },
+  "main_and_upstream_untouched": true
+}

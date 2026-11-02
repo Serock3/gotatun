@@ -187,6 +187,8 @@ Actions/Bencher integration, or changes to default benchmarks are introduced.
 Pass `--direction upload` for the mirrored test. Alice remains the iperf client
 and measured endpoint: upload uses her sender throughput/intervals; download uses
 her receiver throughput/intervals. Endpoint combinations always name Alice/Bob.
+The [upload results and first-slice integration](KERNEL-UPLOAD-RESULTS.md) describe
+the selected kernel-peer approach for both numeric benchmarks.
 
 ## Upload counterpart
 

@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "repository": "gotatun",
+  "name": "gotatun-download",
+  "commit": "1c1e3138dd8dbc2e19af3b2348e2e0149cab8d45",
+  "branch": "validation/kernel-peer-core",
+  "commit_message": "Use a leased kernel WireGuard peer for throughput benchmarks",
+  "description": "TCP throughput and CPU on Alice against a kernel WireGuard peer",
+  "date": "2026-11-02T23:18:40.926323274Z",
+  "measurements": {
+    "cpu.gotatun": {
+      "label": "GotaTun CPU",
+      "unit": "percent",
+      "value": 389.2091613914507
+    },
+    "cpu.iperf": {
+      "label": "iperf CPU",
+      "unit": "percent",
+      "value": 79.7157960740567
+    },
+    "throughput.network": {
+      "label": "Throughput",
+      "unit": "bits_per_second",
+      "value": 2657818997.64767,
+      "uncertainty": {
+        "method": "independent_intervals",
+        "sample_count": 30,
+        "standard_error": 44657356.93838986
+      }
+    }
+  },
+  "status": "success",
+  "parameters": {
+    "aead_backend": "aws-lc-rs",
+    "cpu_scope": "Alice GotaTun process during the full iperf invocation, including setup and omitted warmup",
+    "direction": "download",
+    "duration_seconds": "30",
+    "listen_port": "51832",
+    "measured_host": "alice",
+    "mtu": "1440",
+    "peer_implementation": "linux-wireguard",
+    "warmup_seconds": "3"
+  }
+}

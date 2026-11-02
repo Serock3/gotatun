@@ -1,0 +1,23 @@
+{
+  "interfaces_absent": true,
+  "experiment_processes_absent": true,
+  "listeners": "",
+  "rmem_max": 212992,
+  "congestion_control": "cubic",
+  "governor": "powersave",
+  "link_speed_mbps": 10000,
+  "time": "2026-11-02T23:34:35.962147+00:00",
+  "runner": "active",
+  "machine_lock_released": true,
+  "disk_free_bytes": 6282579968,
+  "core_source_sha": "1c1e3138dd8dbc2e19af3b2348e2e0149cab8d45",
+  "bob": {
+    "interfaces_absent": true,
+    "experiment_processes_absent": true,
+    "listeners": "",
+    "rmem_max": 212992,
+    "congestion_control": "cubic",
+    "governor": "powersave",
+    "link_speed_mbps": 10000
+  }
+}
