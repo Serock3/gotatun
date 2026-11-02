@@ -46,6 +46,8 @@ const PROBE: &[u8; 8] = b"UPPROBE1";
 #[derive(Args)]
 pub struct DrainArgs {
     #[arg(long)]
+    kernel_drop: bool,
+    #[arg(long)]
     mode: Mode,
     #[arg(long)]
     bind: SocketAddrV4,
@@ -65,6 +67,8 @@ pub struct DrainArgs {
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct DrainReport {
+    kernel_drop: bool,
+    received_datagrams: u64,
     packets: u64,
     duplicates: u64,
     invalid: u64,
@@ -75,7 +79,7 @@ pub struct DrainReport {
 
 pub fn drain(args: DrainArgs) -> Result<()> {
     ensure!(
-        (1_000..=2_000_000).contains(&args.packets) && (64..=1400).contains(&args.payload),
+        (1_000..=40_000_000).contains(&args.packets) && (64..=1400).contains(&args.payload),
         "invalid drain geometry"
     );
     let socket = UdpSocket::bind(args.bind)?;
@@ -138,6 +142,7 @@ pub fn drain(args: DrainArgs) -> Result<()> {
     let (thread, bind) = (
         std::thread::spawn(move || -> Result<DrainReport> {
             let mut report = DrainReport {
+                kernel_drop: args.kernel_drop,
                 receive_buffer_bytes,
                 probe_authenticated: authenticated,
                 ..Default::default()
@@ -147,6 +152,12 @@ pub fn drain(args: DrainArgs) -> Result<()> {
             let until = Instant::now() + Duration::from_secs(90);
             while !stop.load(Relaxed) {
                 ensure!(Instant::now() < until, "peer drain lease expired");
+                if args.kernel_drop {
+                    // Keep the UDP port open to avoid ICMP errors. Once its queue
+                    // fills Linux drops data; there is no receive/decrypt workload.
+                    std::thread::sleep(Duration::from_millis(50));
+                    continue;
+                }
                 batch.receive(&socket, |data| {
                     if args.mode == Mode::Gotatun
                         && data.first() == Some(&4)
@@ -164,6 +175,7 @@ pub fn drain(args: DrainArgs) -> Result<()> {
                         report.invalid += 1;
                         return;
                     }
+                    report.received_datagrams += 1;
                     let seq = u64::from_le_bytes(data[8..16].try_into().unwrap());
                     let Some(seen) = usize::try_from(seq).ok().and_then(|i| seen.get_mut(i)) else {
                         report.invalid += 1;
@@ -238,11 +250,38 @@ struct Generator {
     thread: Option<JoinHandle<Result<SendReport>>>,
 }
 impl Generator {
-    fn start(socket: UdpSocket, pool: Pool, payload: usize, batch: usize, rate: f64) -> Self {
+    fn start(
+        socket: UdpSocket,
+        pool: Pool,
+        payload: usize,
+        batch: usize,
+        rate: f64,
+        loops: u16,
+    ) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
         let flag = stop.clone();
-        let thread = std::thread::spawn(move || {
-            batch::send_cancellable(&socket, &pool, payload, batch, rate, Some(&flag))
+        let thread = std::thread::spawn(move || -> Result<SendReport> {
+            let start = Instant::now();
+            let mut total = SendReport {
+                packets: 0,
+                datagram_bytes: pool.stride,
+                prepare_seconds: pool.prepare_seconds,
+                send_seconds: 0.0,
+                offered_payload_gbps: 0.0,
+                syscalls: 0,
+                partial_sends: 0,
+            };
+            for _ in 0..loops {
+                let report =
+                    batch::send_cancellable(&socket, &pool, payload, batch, rate, Some(&flag))?;
+                total.packets += report.packets;
+                total.syscalls += report.syscalls;
+                total.partial_sends += report.partial_sends;
+            }
+            total.send_seconds = start.elapsed().as_secs_f64();
+            total.offered_payload_gbps =
+                total.packets as f64 * payload as f64 * 8.0 / total.send_seconds / 1e9;
+            Ok(total)
         });
         Self {
             stop,
@@ -355,6 +394,15 @@ impl Nic {
 
 pub async fn run(args: Run) -> Result<()> {
     crate::run::validate(&args)?;
+    for rate in &args.rates {
+        ensure!(
+            *rate == 0.0
+                || args.packets as f64 * args.payload as f64 * 8.0 * args.input_loops as f64
+                    / (*rate * 1e9)
+                    <= 55.0,
+            "paced upload train would exceed 55 seconds"
+        );
+    }
     let _lock = MachineLock::acquire("/tmp/benchy.lock")?;
     crate::run::verify_physical_route(&args).await?;
     let source_sha = String::from_utf8(checked_output("git", ["rev-parse", "HEAD"]).await?.stdout)?
@@ -383,7 +431,7 @@ pub async fn run(args: Run) -> Result<()> {
         let mut id=0;
         for repetition in 1..=study.settings.repetitions {for &rate in &study.settings.rates {for &mode in &study.settings.modes {
             let t=trial(&study.settings,&binary,&remote_binary,mode,rate,repetition,20440+id).await?;id+=1;
-            eprintln!("Upload {mode:?} requested={rate:.2} offered={:.3} output={:.3} Gb/s peer_received={} nic_packets={} cpu={:?}",t.offered.offered_payload_gbps,t.local_output_payload_gbps,t.peer_drain.packets,t.nic_delta.tx_packets,t.cpu_percent);
+            eprintln!("Upload {mode:?} requested={rate:.2} offered={:.3} output={:.3} Gb/s peer_received={} nic_packets={} cpu={:?}",t.offered.offered_payload_gbps,t.local_output_payload_gbps,t.peer_drain.received_datagrams,t.nic_delta.tx_packets,t.cpu_percent);
             study.trials.push(t);save(&study).await?;
         }}}
         Ok(())
@@ -459,7 +507,7 @@ async fn trial(
         } else {
             None
         };
-        let values = vec![
+        let mut values = vec![
             "drain".into(),
             "--mode".into(),
             if mode == Mode::Direct {
@@ -479,10 +527,13 @@ async fn trial(
             "--control".into(),
             SocketAddrV4::new(args.bob, port).to_string(),
             "--packets".into(),
-            args.packets.to_string(),
+            (args.packets * args.input_loops as u32).to_string(),
             "--payload".into(),
             args.payload.to_string(),
         ];
+        if args.peer_kernel_drop {
+            values.push("--kernel-drop".into());
+        }
         processes.push(
             Process::command(remote_binary)
                 .args(values)
@@ -546,15 +597,20 @@ async fn trial(
         } else {
             None
         };
-        let offered = Generator::start(
-            socket,
-            pool,
-            args.payload as usize,
-            args.batch as usize,
-            rate,
+        let offered = tokio::time::timeout(
+            Duration::from_secs(60),
+            Generator::start(
+                socket,
+                pool,
+                args.payload as usize,
+                args.batch as usize,
+                rate,
+                args.input_loops,
+            )
+            .finish(),
         )
-        .finish()
-        .await?;
+        .await
+        .context("upload generator exceeded 60 seconds")??;
         let mut last = Nic::read(&args.nic)?.tx_packets;
         let mut quiet = 0;
         for _ in 0..30 {

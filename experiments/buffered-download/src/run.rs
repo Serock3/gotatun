@@ -60,6 +60,14 @@ struct Trial {
 }
 
 pub async fn run(args: Run) -> Result<()> {
+    ensure!(
+        !args.peer_kernel_drop,
+        "peer-kernel-drop applies only to upload"
+    );
+    ensure!(
+        args.input_loops == 1,
+        "input-loops applies only to upload, never to encrypted download pools"
+    );
     validate(&args)?;
     let _lock = MachineLock::acquire("/tmp/benchy.lock")?;
     verify_physical_route(&args).await?;

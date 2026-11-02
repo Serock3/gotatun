@@ -69,6 +69,12 @@ struct Run {
     modes: Vec<Mode>,
     #[arg(long, default_value_t=1, value_parser=clap::value_parser!(u16).range(1..=10))]
     repetitions: u16,
+    /// Repeat plaintext within an upload trial; every WireGuard packet is encrypted afresh.
+    #[arg(long, default_value_t=1, value_parser=clap::value_parser!(u16).range(1..=20))]
+    input_loops: u16,
+    /// Upload only: Bob keeps the socket open but never reads data after the probe.
+    #[arg(long)]
+    peer_kernel_drop: bool,
     /// Optional taskset CPU list for Alice's GotaTun process only.
     #[arg(long)]
     endpoint_cpus: Option<String>,

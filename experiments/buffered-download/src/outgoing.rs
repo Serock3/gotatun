@@ -170,4 +170,71 @@ mod tests {
         assert_eq!(stats.snapshot().packets, 1);
         assert!(stats.snapshot().transport_error);
     }
+
+    #[derive(Clone)]
+    struct BatchFake {
+        fail: bool,
+        called: Arc<AtomicU64>,
+    }
+    impl UdpSend for BatchFake {
+        type SendManyBuf = ();
+        async fn send_to(&self, _: Packet, _: SocketAddr) -> io::Result<()> {
+            panic!("must preserve the batched transport method")
+        }
+        fn max_number_of_packets_to_send(&self) -> usize {
+            64
+        }
+        async fn send_many_to(
+            &self,
+            _: &mut (),
+            packets: &mut Vec<(Packet, SocketAddr)>,
+        ) -> io::Result<()> {
+            self.called.fetch_add(1, Relaxed);
+            if self.fail {
+                packets.remove(0);
+                Err(io::Error::other("one packet sent before failure"))
+            } else {
+                packets.clear();
+                Ok(())
+            }
+        }
+    }
+    #[tokio::test]
+    async fn preserves_batching_and_invalidates_partially_failed_batches() {
+        let stats = Arc::new(Counters::new(100));
+        let calls = Arc::new(AtomicU64::new(0));
+        let send = CountedSend {
+            inner: BatchFake {
+                fail: false,
+                called: calls.clone(),
+            },
+            counters: Some(stats.clone()),
+        };
+        let target = "127.0.0.1:1000".parse().unwrap();
+        let mut data = [0u8; 100];
+        data[0] = 4;
+        let packets = || {
+            vec![
+                (Packet::copy_from(&data[..]), target),
+                (Packet::copy_from(&[1u8; 148][..]), target),
+                (Packet::copy_from(&data[..]), target),
+            ]
+        };
+        assert_eq!(send.max_number_of_packets_to_send(), 64);
+        let mut batch = packets();
+        send.send_many_to(&mut (), &mut batch).await.unwrap();
+        assert!(batch.is_empty());
+        assert_eq!(stats.snapshot().packets, 2);
+        assert_eq!(calls.load(Relaxed), 1);
+        let send = CountedSend {
+            inner: BatchFake {
+                fail: true,
+                called: calls.clone(),
+            },
+            counters: Some(stats.clone()),
+        };
+        assert!(send.send_many_to(&mut (), &mut packets()).await.is_err());
+        assert_eq!(stats.snapshot().packets, 2);
+        assert!(stats.snapshot().transport_error);
+    }
 }
