@@ -37,6 +37,8 @@ def summarize(files):
                 "mode": mode,
                 "packets_per_trial": study["settings"]["packets"],
                 "send_batch": study["settings"]["batch"],
+                "no_catch_up": study["settings"].get("no_catch_up", False),
+                "payload_receive_buffer_bytes": trials[0]["receiver"]["receive_buffer_bytes"],
                 "requested_payload_gbps": rate,
                 "samples": len(trials),
                 "offered_mean_gbps": statistics.mean(t["sender"]["offered_payload_gbps"] for t in trials),

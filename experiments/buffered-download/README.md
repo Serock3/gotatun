@@ -88,6 +88,9 @@ accounting. Socket tests require a normal Linux environment (no root required).
 
 ## Paced download capacity search
 
+See [CAPACITY-RESULTS.md](CAPACITY-RESULTS.md) for the measured searches, including
+failed confirmations and the longer-trial pacing comparison.
+
 Search for the highest offered rate within an explicit packet-loss budget. Select
 one mode and at least three repetitions. The example prepares four million fresh
 packets (~5.06 GB) **before each trial**, giving about 13 seconds of data at 3 Gb/s:

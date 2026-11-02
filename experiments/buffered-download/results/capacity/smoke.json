@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "status": "success",
+  "source_sha": "d3dd50ab2fd492c5f65733ee575225623dc62b46",
+  "aead_backend": "aws-lc-rs",
+  "cpu_scope": "Alice GotaTun process only; START through receiver drain, including idle tail; CPU seconds/Gbit uses delivered payload",
+  "settings": {
+    "peer": "mole@10.0.0.2",
+    "alice": "10.0.0.1",
+    "bob": "10.0.0.2",
+    "nic": "eno2",
+    "interface": "bgio0",
+    "packets": 100000,
+    "payload": 1200,
+    "batch": 64,
+    "rates": [
+      3.0
+    ],
+    "modes": [
+      "gotatun"
+    ],
+    "repetitions": 1,
+    "input_loops": 1,
+    "peer_kernel_drop": false,
+    "endpoint_cpus": null,
+    "receive_buffer_mib": 0,
+    "output": "/home/mole/benchy-experiments/results/capacity/smoke.json"
+  },
+  "trials": [
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 3.0,
+      "repetition": 1,
+      "sender": {
+        "packets": 100000,
+        "datagram_bytes": 1264,
+        "prepare_seconds": 0.138214029,
+        "send_seconds": 0.319943479,
+        "offered_payload_gbps": 3.000529977984018,
+        "syscalls": 1563,
+        "partial_sends": 0
+      },
+      "receiver": {
+        "unique": 97849,
+        "duplicates": 0,
+        "invalid": 0,
+        "receive_buffer_bytes": 425984,
+        "kernel_socket_drops": 0,
+        "arrival_span_seconds": 0.300993581
+      },
+      "delivered_payload_gbps": 2.935988578157582,
+      "delivery_window_seconds": 0.319943479,
+      "payload_per_send_window_gbps": 2.935988578157582,
+      "loss_percent": 2.151000000000003,
+      "gotatun_cpu_percent": 100.42487129259538,
+      "cpu_window_seconds": 0.53059339,
+      "gotatun_cpu_seconds_per_payload_gigabit": 0.5672512930153846,
+      "gotatun_outer_socket_drops": 73,
+      "gotatun_receive_buffer_bytes": 425984
+    }
+  ],
+  "error": null
+}

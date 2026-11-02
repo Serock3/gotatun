@@ -1,0 +1,311 @@
+{
+  "schema_version": 2,
+  "status": "failed",
+  "source_sha": "88a723a200f47fc8e92a2a332284809f499c705b",
+  "aead_backend": "aws-lc-rs",
+  "cpu_scope": "Alice GotaTun process only; START through receiver drain, including idle tail; CPU seconds/Gbit uses delivered payload",
+  "settings": {
+    "peer": "mole@10.0.0.2",
+    "alice": "10.0.0.1",
+    "bob": "10.0.0.2",
+    "nic": "eno2",
+    "interface": "bgio0",
+    "packets": 4000000,
+    "payload": 1200,
+    "batch": 64,
+    "rates": [
+      2.0,
+      3.0
+    ],
+    "modes": [
+      "gotatun"
+    ],
+    "repetitions": 3,
+    "input_loops": 1,
+    "peer_kernel_drop": false,
+    "endpoint_cpus": null,
+    "receive_buffer_mib": 0,
+    "output": "/home/mole/benchy-experiments/results/capacity/batch-64.json"
+  },
+  "capacity_search": {
+    "options": {
+      "min_gbps": 2.0,
+      "max_gbps": 3.0,
+      "resolution_gbps": 0.125,
+      "loss_budget_percent": 0.1
+    },
+    "points": [
+      {
+        "phase": "lower_bound",
+        "requested_payload_gbps": 2.0,
+        "first_trial_index": 0,
+        "trial_count": 3,
+        "passes": true,
+        "max_loss_percent": 0.017299999999997873
+      },
+      {
+        "phase": "upper_bound",
+        "requested_payload_gbps": 3.0,
+        "first_trial_index": 3,
+        "trial_count": 3,
+        "passes": false,
+        "max_loss_percent": 0.20092499999999625
+      }
+    ],
+    "passing_lower_gbps": 2.0,
+    "failing_upper_gbps": 3.0,
+    "confirmed": false,
+    "outcome": "running"
+  },
+  "trials": [
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 2.0,
+      "repetition": 1,
+      "sender": {
+        "packets": 4000000,
+        "datagram_bytes": 1264,
+        "prepare_seconds": 3.990758871,
+        "send_seconds": 19.199783539,
+        "offered_payload_gbps": 2.000022548275043,
+        "syscalls": 62500,
+        "partial_sends": 0
+      },
+      "receiver": {
+        "unique": 3999347,
+        "duplicates": 0,
+        "invalid": 0,
+        "receive_buffer_bytes": 425984,
+        "kernel_socket_drops": 0,
+        "arrival_span_seconds": 19.190357159
+      },
+      "delivered_payload_gbps": 1.999696044594037,
+      "delivery_window_seconds": 19.199783539,
+      "payload_per_send_window_gbps": 1.999696044594037,
+      "loss_percent": 0.016324999999994816,
+      "gotatun_cpu_percent": 89.16845969294378,
+      "cpu_window_seconds": 19.415564344,
+      "gotatun_cpu_seconds_per_payload_gigabit": 0.45092152091321624,
+      "gotatun_outer_socket_drops": 26,
+      "gotatun_receive_buffer_bytes": 425984
+    },
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 2.0,
+      "repetition": 2,
+      "sender": {
+        "packets": 4000000,
+        "datagram_bytes": 1264,
+        "prepare_seconds": 3.973330216,
+        "send_seconds": 19.199782024,
+        "offered_payload_gbps": 2.0000227060911135,
+        "syscalls": 62500,
+        "partial_sends": 0
+      },
+      "receiver": {
+        "unique": 3999679,
+        "duplicates": 0,
+        "invalid": 0,
+        "receive_buffer_bytes": 425984,
+        "kernel_socket_drops": 0,
+        "arrival_span_seconds": 19.190366114
+      },
+      "delivered_payload_gbps": 1.9998622042689496,
+      "delivery_window_seconds": 19.199782024,
+      "payload_per_send_window_gbps": 1.9998622042689496,
+      "loss_percent": 0.008025000000000393,
+      "gotatun_cpu_percent": 88.61697700545484,
+      "cpu_window_seconds": 19.412234983,
+      "gotatun_cpu_seconds_per_payload_gigabit": 0.4480186569120603,
+      "gotatun_outer_socket_drops": 18,
+      "gotatun_receive_buffer_bytes": 425984
+    },
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 2.0,
+      "repetition": 3,
+      "sender": {
+        "packets": 4000000,
+        "datagram_bytes": 1264,
+        "prepare_seconds": 3.973913619,
+        "send_seconds": 19.199782333,
+        "offered_payload_gbps": 2.0000226739028832,
+        "syscalls": 62500,
+        "partial_sends": 0
+      },
+      "receiver": {
+        "unique": 3999308,
+        "duplicates": 0,
+        "invalid": 0,
+        "receive_buffer_bytes": 425984,
+        "kernel_socket_drops": 0,
+        "arrival_span_seconds": 19.190412053
+      },
+      "delivered_payload_gbps": 1.999676669980298,
+      "delivery_window_seconds": 19.199782333,
+      "payload_per_send_window_gbps": 1.999676669980298,
+      "loss_percent": 0.017299999999997873,
+      "gotatun_cpu_percent": 92.36689685812892,
+      "cpu_window_seconds": 19.414657545,
+      "gotatun_cpu_seconds_per_payload_gigabit": 0.46707863559221513,
+      "gotatun_outer_socket_drops": 26,
+      "gotatun_receive_buffer_bytes": 425984
+    },
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 3.0,
+      "repetition": 1,
+      "sender": {
+        "packets": 4000000,
+        "datagram_bytes": 1264,
+        "prepare_seconds": 3.941286803,
+        "send_seconds": 12.799881755,
+        "offered_payload_gbps": 3.000027713927893,
+        "syscalls": 62500,
+        "partial_sends": 0
+      },
+      "receiver": {
+        "unique": 3993248,
+        "duplicates": 0,
+        "invalid": 0,
+        "receive_buffer_bytes": 425984,
+        "kernel_socket_drops": 0,
+        "arrival_span_seconds": 12.779301765
+      },
+      "delivered_payload_gbps": 2.9949636671467834,
+      "delivery_window_seconds": 12.799881755,
+      "payload_per_send_window_gbps": 2.9949636671467834,
+      "loss_percent": 0.16880000000000228,
+      "gotatun_cpu_percent": 159.5350383705521,
+      "cpu_window_seconds": 13.015528676,
+      "gotatun_cpu_seconds_per_payload_gigabit": 0.5416520343471762,
+      "gotatun_outer_socket_drops": 302,
+      "gotatun_receive_buffer_bytes": 425984
+    },
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 3.0,
+      "repetition": 2,
+      "sender": {
+        "packets": 4000000,
+        "datagram_bytes": 1264,
+        "prepare_seconds": 3.969253499,
+        "send_seconds": 12.799883067,
+        "offered_payload_gbps": 3.0000274064222436,
+        "syscalls": 62500,
+        "partial_sends": 0
+      },
+      "receiver": {
+        "unique": 3998526,
+        "duplicates": 0,
+        "invalid": 0,
+        "receive_buffer_bytes": 425984,
+        "kernel_socket_drops": 0,
+        "arrival_span_seconds": 12.782614114
+      },
+      "delivered_payload_gbps": 2.998921896322977,
+      "delivery_window_seconds": 12.799883067,
+      "payload_per_send_window_gbps": 2.998921896322977,
+      "loss_percent": 0.03684999999999938,
+      "gotatun_cpu_percent": 155.32117920425802,
+      "cpu_window_seconds": 13.014646641,
+      "gotatun_cpu_seconds_per_payload_gigabit": 0.5266133964133636,
+      "gotatun_outer_socket_drops": 71,
+      "gotatun_receive_buffer_bytes": 425984
+    },
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 3.0,
+      "repetition": 3,
+      "sender": {
+        "packets": 4000000,
+        "datagram_bytes": 1264,
+        "prepare_seconds": 3.998190221,
+        "send_seconds": 12.79988292,
+        "offered_payload_gbps": 3.0000274408759986,
+        "syscalls": 62500,
+        "partial_sends": 0
+      },
+      "receiver": {
+        "unique": 3991963,
+        "duplicates": 0,
+        "invalid": 0,
+        "receive_buffer_bytes": 425984,
+        "kernel_socket_drops": 0,
+        "arrival_span_seconds": 12.781848241
+      },
+      "delivered_payload_gbps": 2.993999635740418,
+      "delivery_window_seconds": 12.79988292,
+      "payload_per_send_window_gbps": 2.993999635740418,
+      "loss_percent": 0.20092499999999625,
+      "gotatun_cpu_percent": 154.21423927348903,
+      "cpu_window_seconds": 13.010719618,
+      "gotatun_cpu_seconds_per_payload_gigabit": 0.5235619220759231,
+      "gotatun_outer_socket_drops": 368,
+      "gotatun_receive_buffer_bytes": 425984
+    },
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 2.5,
+      "repetition": 1,
+      "sender": {
+        "packets": 4000000,
+        "datagram_bytes": 1264,
+        "prepare_seconds": 3.983808169,
+        "send_seconds": 15.359841931,
+        "offered_payload_gbps": 2.500025727641064,
+        "syscalls": 62500,
+        "partial_sends": 0
+      },
+      "receiver": {
+        "unique": 3990057,
+        "duplicates": 0,
+        "invalid": 0,
+        "receive_buffer_bytes": 425984,
+        "kernel_socket_drops": 0,
+        "arrival_span_seconds": 15.305929945
+      },
+      "delivered_payload_gbps": 2.49381128868858,
+      "delivery_window_seconds": 15.359841931,
+      "payload_per_send_window_gbps": 2.49381128868858,
+      "loss_percent": 0.24857499999999533,
+      "gotatun_cpu_percent": 123.34834225238708,
+      "cpu_window_seconds": 15.576572798,
+      "gotatun_cpu_seconds_per_payload_gigabit": 0.501596957294649,
+      "gotatun_outer_socket_drops": 369,
+      "gotatun_receive_buffer_bytes": 425984
+    },
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 2.5,
+      "repetition": 2,
+      "sender": {
+        "packets": 4000000,
+        "datagram_bytes": 1264,
+        "prepare_seconds": 4.015329541,
+        "send_seconds": 15.359840798,
+        "offered_payload_gbps": 2.500025912052425,
+        "syscalls": 62500,
+        "partial_sends": 0
+      },
+      "receiver": {
+        "unique": 3999341,
+        "duplicates": 0,
+        "invalid": 0,
+        "receive_buffer_bytes": 425984,
+        "kernel_socket_drops": 6,
+        "arrival_span_seconds": 15.345034825
+      },
+      "delivered_payload_gbps": 2.4996140327834144,
+      "delivery_window_seconds": 15.359840798,
+      "payload_per_send_window_gbps": 2.4996140327834144,
+      "loss_percent": 0.01647500000000468,
+      "gotatun_cpu_percent": 125.93114511365823,
+      "cpu_window_seconds": 15.57494787,
+      "gotatun_cpu_seconds_per_payload_gigabit": 0.5108578670509488,
+      "gotatun_outer_socket_drops": 25,
+      "gotatun_receive_buffer_bytes": 425984
+    }
+  ],
+  "error": "payload sink dropped 6 packets"
+}

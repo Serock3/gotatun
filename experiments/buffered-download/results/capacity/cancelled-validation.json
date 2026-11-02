@@ -1,0 +1,47 @@
+{
+  "schema_version": 2,
+  "status": "failed",
+  "source_sha": "47b9ef05658d03f3b2f7218776110114abfed815",
+  "aead_backend": "aws-lc-rs",
+  "cpu_scope": "Alice GotaTun process only; START through receiver drain, including idle tail; CPU seconds/Gbit uses delivered payload",
+  "settings": {
+    "peer": "mole@10.0.0.2",
+    "alice": "10.0.0.1",
+    "bob": "10.0.0.2",
+    "nic": "eno2",
+    "interface": "bgio0",
+    "packets": 4000000,
+    "payload": 1200,
+    "batch": 64,
+    "no_catch_up": true,
+    "rates": [
+      2.0,
+      4.0
+    ],
+    "modes": [
+      "gotatun"
+    ],
+    "repetitions": 3,
+    "input_loops": 1,
+    "peer_kernel_drop": false,
+    "endpoint_cpus": null,
+    "receive_buffer_mib": 0,
+    "payload_receive_buffer_mib": 8,
+    "output": "/home/mole/benchy-experiments/results/capacity/cancelled-validation.json"
+  },
+  "capacity_search": {
+    "options": {
+      "min_gbps": 2.0,
+      "max_gbps": 4.0,
+      "resolution_gbps": 0.125,
+      "loss_budget_percent": 0.1
+    },
+    "points": [],
+    "passing_lower_gbps": null,
+    "failing_upper_gbps": null,
+    "confirmed": false,
+    "outcome": "running"
+  },
+  "trials": [],
+  "error": "experiment interrupted"
+}

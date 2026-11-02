@@ -1,0 +1,13 @@
+Mon Nov  2 21:09:47 UTC 2026
+benchy-alice
+               total        used        free      shared  buff/cache   available
+Mem:     16581947392   792563712  3209887744    30781440 12959518720 15789383680
+Swap:     1023406080    15990784  1007415296
+212992
+powersave
+88a723a200f47fc8e92a2a332284809f499c705b
+benchy-bob
+               total        used        free      shared  buff/cache   available
+Mem:     16581939200   506306560 14224044032      925696  2159325184 16075632640
+Swap:     1023406080           0  1023406080
+212992

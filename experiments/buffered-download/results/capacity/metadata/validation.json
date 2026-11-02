@@ -1,0 +1,123 @@
+{
+  "checks": "Raw packet counts, throughput windows, offered rates, missing-block sums, actual socket sizes, per-repetition loss acceptance and confirmation decisions",
+  "reports": [
+    {
+      "file": "batch-256.json",
+      "status": "success",
+      "trials": 3,
+      "source_sha": "8c7809445b9efe80645bc5ca626cd605f35f8c50",
+      "outcome": "below_search_minimum",
+      "confirmed": false,
+      "error": null
+    },
+    {
+      "file": "batch-64-narrow-invalid.json",
+      "status": "failed",
+      "trials": 8,
+      "source_sha": "88a723a200f47fc8e92a2a332284809f499c705b",
+      "outcome": "running",
+      "confirmed": false,
+      "error": "payload sink dropped 6 packets"
+    },
+    {
+      "file": "batch-64-wide-invalid.json",
+      "status": "failed",
+      "trials": 4,
+      "source_sha": "88a723a200f47fc8e92a2a332284809f499c705b",
+      "outcome": "running",
+      "confirmed": false,
+      "error": "payload sink dropped 648 packets"
+    },
+    {
+      "file": "batch-64.json",
+      "status": "success",
+      "trials": 21,
+      "source_sha": "8c7809445b9efe80645bc5ca626cd605f35f8c50",
+      "outcome": "unstable_confirmation",
+      "confirmed": false,
+      "error": null
+    },
+    {
+      "file": "cancelled-validation.json",
+      "status": "failed",
+      "trials": 0,
+      "source_sha": "47b9ef05658d03f3b2f7218776110114abfed815",
+      "outcome": "running",
+      "confirmed": false,
+      "error": "experiment interrupted"
+    },
+    {
+      "file": "direct-256.json",
+      "status": "success",
+      "trials": 3,
+      "source_sha": "47b9ef05658d03f3b2f7218776110114abfed815",
+      "outcome": null,
+      "confirmed": null,
+      "error": null
+    },
+    {
+      "file": "direct-64.json",
+      "status": "success",
+      "trials": 3,
+      "source_sha": "88a723a200f47fc8e92a2a332284809f499c705b",
+      "outcome": null,
+      "confirmed": null,
+      "error": null
+    },
+    {
+      "file": "direct-6m-no-catch-up.json",
+      "status": "success",
+      "trials": 3,
+      "source_sha": "47b9ef05658d03f3b2f7218776110114abfed815",
+      "outcome": null,
+      "confirmed": null,
+      "error": null
+    },
+    {
+      "file": "no-catch-up-2.875.json",
+      "status": "success",
+      "trials": 3,
+      "source_sha": "47b9ef05658d03f3b2f7218776110114abfed815",
+      "outcome": null,
+      "confirmed": null,
+      "error": null
+    },
+    {
+      "file": "no-catch-up-search.json",
+      "status": "success",
+      "trials": 15,
+      "source_sha": "47b9ef05658d03f3b2f7218776110114abfed815",
+      "outcome": "confirmed_bracket",
+      "confirmed": true,
+      "error": null
+    },
+    {
+      "file": "pool-6m-batch-64.json",
+      "status": "success",
+      "trials": 15,
+      "source_sha": "8c7809445b9efe80645bc5ca626cd605f35f8c50",
+      "outcome": "unstable_confirmation",
+      "confirmed": false,
+      "error": null
+    },
+    {
+      "file": "sink-buffer-smoke.json",
+      "status": "success",
+      "trials": 1,
+      "source_sha": "8c7809445b9efe80645bc5ca626cd605f35f8c50",
+      "outcome": null,
+      "confirmed": null,
+      "error": null
+    },
+    {
+      "file": "smoke.json",
+      "status": "success",
+      "trials": 1,
+      "source_sha": "d3dd50ab2fd492c5f65733ee575225623dc62b46",
+      "outcome": null,
+      "confirmed": null,
+      "error": null
+    }
+  ],
+  "total_completed_trials": 80
+}

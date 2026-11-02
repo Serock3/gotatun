@@ -1,0 +1,68 @@
+{
+  "schema_version": 2,
+  "status": "success",
+  "source_sha": "8c7809445b9efe80645bc5ca626cd605f35f8c50",
+  "aead_backend": "aws-lc-rs",
+  "cpu_scope": "Alice GotaTun process only; START through receiver drain, including idle tail; CPU seconds/Gbit uses delivered payload",
+  "settings": {
+    "peer": "mole@10.0.0.2",
+    "alice": "10.0.0.1",
+    "bob": "10.0.0.2",
+    "nic": "eno2",
+    "interface": "bgio0",
+    "packets": 100000,
+    "payload": 1200,
+    "batch": 64,
+    "rates": [
+      3.0
+    ],
+    "modes": [
+      "gotatun"
+    ],
+    "repetitions": 1,
+    "input_loops": 1,
+    "peer_kernel_drop": false,
+    "endpoint_cpus": null,
+    "receive_buffer_mib": 0,
+    "payload_receive_buffer_mib": 8,
+    "output": "/home/mole/benchy-experiments/results/capacity/sink-buffer-smoke.json"
+  },
+  "capacity_search": null,
+  "trials": [
+    {
+      "mode": "gotatun",
+      "requested_payload_gbps": 3.0,
+      "repetition": 1,
+      "sender": {
+        "packets": 100000,
+        "datagram_bytes": 1264,
+        "prepare_seconds": 0.138290922,
+        "send_seconds": 0.319943099,
+        "offered_payload_gbps": 3.0005335417470596,
+        "syscalls": 1563,
+        "partial_sends": 0
+      },
+      "receiver": {
+        "unique": 97043,
+        "duplicates": 0,
+        "invalid": 0,
+        "receive_buffer_bytes": 16777216,
+        "kernel_socket_drops": 0,
+        "arrival_span_seconds": 0.299654324,
+        "missing_per_100k_packets": [
+          2957
+        ]
+      },
+      "delivered_payload_gbps": 2.9118077649175986,
+      "delivery_window_seconds": 0.319943099,
+      "payload_per_send_window_gbps": 2.9118077649175986,
+      "loss_percent": 2.9569999999999985,
+      "gotatun_cpu_percent": 101.99511087569297,
+      "cpu_window_seconds": 0.532147726,
+      "gotatun_cpu_seconds_per_payload_gigabit": 0.5826075630950743,
+      "gotatun_outer_socket_drops": 112,
+      "gotatun_receive_buffer_bytes": 425984
+    }
+  ],
+  "error": null
+}
