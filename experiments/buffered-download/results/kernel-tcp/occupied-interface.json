@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "status": "failed",
+  "source_sha": "95a1238bf6e44585b78af674ce4d3ac3f6f79aa6",
+  "direction": "download",
+  "measured_host": "alice",
+  "mtu": 1440,
+  "aead_backend": "aws-lc-rs for GotaTun; Linux WireGuard for kernel endpoints",
+  "cpu_scope": "Alice GotaTun process only, whole iperf invocation including connection setup and omitted warmup; kernel endpoint helper CPU is not a datapath metric",
+  "settings": {
+    "peer": "mole@10.0.0.2",
+    "alice": "10.0.0.1",
+    "bob": "10.0.0.2",
+    "nic": "eno2",
+    "interface": "bgio0",
+    "duration": 2,
+    "warmup": 0,
+    "repetitions": 1,
+    "cases": [
+      "kernel_kernel"
+    ],
+    "output": "/home/mole/benchy-experiments/results/kernel-tcp/occupied-interface.json"
+  },
+  "trials": [],
+  "error": "process exited before reporting readiness"
+}

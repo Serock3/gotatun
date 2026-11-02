@@ -1,0 +1,6 @@
+{
+  "controller_rejected_existing_interface": true,
+  "interface_preserved": true,
+  "failure_recorded": true,
+  "test_fixture_removed": true
+}

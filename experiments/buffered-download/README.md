@@ -153,6 +153,9 @@ definition for the initial and refined experimental report versions.
 
 ## Kernel-peer TCP comparison
 
+See [KERNEL-TCP-RESULTS.md](KERNEL-TCP-RESULTS.md) for the measured comparison,
+raw results and resource-cleanup checks.
+
 The optional `kernel-tcp` command compares Alice/Bob endpoint implementations:
 kernel/kernel (sender-headroom control), GotaTun/kernel, and GotaTun/GotaTun.
 Every case uses the same physical link, 1440-byte tunnel MTU, one TCP stream and

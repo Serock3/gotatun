@@ -1,0 +1,20 @@
+{
+  "interface_absent": true,
+  "endpoints_absent": true,
+  "listeners": "",
+  "rmem_max": 212992,
+  "congestion_control": "cubic",
+  "link_speed_mbps": 10000,
+  "time": "2026-11-02T22:36:46.419651+00:00",
+  "runner": "active",
+  "machine_lock_released": true,
+  "disk_free_bytes": 6617268224,
+  "bob": {
+    "interface_absent": true,
+    "endpoints_absent": true,
+    "listeners": "",
+    "rmem_max": 212992,
+    "congestion_control": "cubic",
+    "link_speed_mbps": 10000
+  }
+}

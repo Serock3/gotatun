@@ -1,0 +1,19 @@
+Mon Nov  2 22:22:47 UTC 2026
+benchy-alice
+6.1.0-47-amd64
+               total        used        free      shared  buff/cache   available
+Mem:     16581947392   783450112  3211321344    30781440 12967198720 15798497280
+Swap:     1023406080    15990784  1007415296
+212992
+cubic
+powersave
+wireguard-tools v1.0.20210914 - https://git.zx2c4.com/wireguard-tools/
+iperf 3.12 (cJSON 1.7.15)
+Linux benchy-alice 6.1.0-47-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.170-3 (2026-05-08) x86_64
+Optional features available: CPU affinity setting, IPv6 flow label, SCTP, TCP congestion algorithm setting, sendfile / zerocopy, socket pacing, authentication, bind to device, support IPv4 don't fragment
+benchy-bob
+6.1.0-47-amd64
+212992
+cubic
+powersave
+wireguard-tools v1.0.20210914 - https://git.zx2c4.com/wireguard-tools/

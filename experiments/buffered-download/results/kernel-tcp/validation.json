@@ -1,0 +1,20 @@
+{
+  "source_sha": "95a1238bf6e44585b78af674ce4d3ac3f6f79aa6",
+  "rust_tests_passed": 8,
+  "clippy_warnings_denied_passed": true,
+  "analyzer_validated_main_trials": 15,
+  "analyzer_validated_smoke_trials": 3,
+  "actual_mss_values": [
+    1388
+  ],
+  "interruption_wrote_failed_report": true,
+  "existing_interface_ownership_checks": {
+    "controller_rejected_existing_interface": true,
+    "interface_preserved": true,
+    "failure_recorded": true,
+    "test_fixture_removed": true
+  },
+  "alice_iperf_processes_absent": true,
+  "bob_iperf_processes_absent": true,
+  "main_review_upstream_untouched": true
+}
