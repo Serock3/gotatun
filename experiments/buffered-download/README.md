@@ -184,6 +184,10 @@ stopping helpers, removing a leftover interface only if it matches that helper's
 PID. No persistent WireGuard config or key files, global sysctls, NIC changes,
 Actions/Bencher integration, or changes to default benchmarks are introduced.
 
+Pass `--direction upload` for the mirrored test. Alice remains the iperf client
+and measured endpoint: upload uses her sender throughput/intervals; download uses
+her receiver throughput/intervals. Endpoint combinations always name Alice/Bob.
+
 ## Upload counterpart
 
 The `upload` command measures Alice's local encrypted output while Bob discards

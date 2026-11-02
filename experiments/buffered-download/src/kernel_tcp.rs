@@ -39,6 +39,22 @@ const MTU: u16 = 1440;
 
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq, ValueEnum)]
 #[serde(rename_all = "snake_case")]
+pub enum Traffic {
+    Download,
+    Upload,
+}
+
+impl Traffic {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Download => "download",
+            Self::Upload => "upload",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq, ValueEnum)]
+#[serde(rename_all = "snake_case")]
 pub enum Case {
     KernelKernel,
     GotatunKernel,
@@ -53,6 +69,8 @@ impl Case {
 
 #[derive(Args, Serialize)]
 pub struct Settings {
+    #[arg(long, default_value = "download")]
+    direction: Traffic,
     #[arg(long, default_value = "mole@10.0.0.2")]
     peer: String,
     #[arg(long, default_value = "10.0.0.1")]
@@ -98,7 +116,7 @@ struct Study {
 struct Trial {
     case: Case,
     repetition: u16,
-    receiver_payload_gbps: f64,
+    alice_payload_gbps: f64,
     alice_gotatun_cpu_percent: Option<f64>,
     alice_iperf_cpu_percent: f64,
     cpu_window_seconds: f64,
@@ -193,10 +211,10 @@ pub async fn run(settings: Settings) -> Result<()> {
         .trim()
         .to_owned();
     let mut study = Study {
-        schema_version: 1,
+        schema_version: 2,
         status: "running",
         source_sha,
-        direction: "download",
+        direction: settings.direction.name(),
         measured_host: "alice",
         mtu: MTU,
         aead_backend: "aws-lc-rs for GotaTun; Linux WireGuard for kernel endpoints",
@@ -221,8 +239,8 @@ pub async fn run(settings: Settings) -> Result<()> {
             for index in 0..study.settings.cases.len() {
                 let case = study.settings.cases[(index + usize::from(repetition-1)) % study.settings.cases.len()];
                 let trial = trial(&study.settings, &binary, &remote_binary, case, repetition).await?;
-                eprintln!("{case:?} repetition={repetition} Alice receive={:.3} Gb/s GotaTun CPU={:?} iperf CPU={:.1}% sender retransmits={:?}",
-                    trial.receiver_payload_gbps, trial.alice_gotatun_cpu_percent, trial.alice_iperf_cpu_percent, trial.sender_retransmits);
+                eprintln!("{case:?} {} repetition={repetition} Alice={:.3} Gb/s GotaTun CPU={:?} iperf CPU={:.1}% sender retransmits={:?}",
+                    study.direction, trial.alice_payload_gbps, trial.alice_gotatun_cpu_percent, trial.alice_iperf_cpu_percent, trial.sender_retransmits);
                 study.trials.push(trial);
                 save(&study).await?;
                 tokio::select! {_=sleep(Duration::from_secs(2))=>{}, _=tokio::signal::ctrl_c()=>bail!("experiment interrupted")}
@@ -383,27 +401,28 @@ async fn trial(
         } else {
             None
         };
+        let mut client = Command::new("iperf3");
+        client.args([
+            "--client".into(),
+            BOB_TUN.to_string(),
+            "--bind".into(),
+            ALICE_TUN.to_string(),
+            "--port".into(),
+            IPERF_PORT.to_string(),
+            "--time".into(),
+            settings.duration.to_string(),
+            "--omit".into(),
+            settings.warmup.to_string(),
+            "--json".into(),
+            "--interval".into(),
+            "1".into(),
+        ]);
+        if settings.direction == Traffic::Download {
+            client.arg("--reverse");
+        }
         let output = timeout(
             Duration::from_secs(u64::from(settings.duration + settings.warmup) + 20),
-            Command::new("iperf3")
-                .args([
-                    "--client".into(),
-                    BOB_TUN.to_string(),
-                    "--bind".into(),
-                    ALICE_TUN.to_string(),
-                    "--port".into(),
-                    IPERF_PORT.to_string(),
-                    "--time".into(),
-                    settings.duration.to_string(),
-                    "--omit".into(),
-                    settings.warmup.to_string(),
-                    "--reverse".into(),
-                    "--json".into(),
-                    "--interval".into(),
-                    "1".into(),
-                ])
-                .kill_on_drop(true)
-                .output(),
+            client.kill_on_drop(true).output(),
         )
         .await
         .context("iperf timed out")??;
@@ -420,15 +439,18 @@ async fn trial(
             raw["error"]
         );
         let parsed = parse_iperf_output(output).await?;
-        let receiver_payload_gbps = parsed.end.sum_received.bits_per_second / 1e9;
+        let alice_payload_gbps = match settings.direction {
+            Traffic::Download => parsed.end.sum_received.bits_per_second,
+            Traffic::Upload => parsed.end.sum_sent.bits_per_second,
+        } / 1e9;
         ensure!(
-            receiver_payload_gbps.is_finite() && receiver_payload_gbps > 0.0,
-            "no received TCP payload"
+            alice_payload_gbps.is_finite() && alice_payload_gbps > 0.0,
+            "no TCP payload measured on Alice"
         );
         Ok(Trial {
             case,
             repetition,
-            receiver_payload_gbps,
+            alice_payload_gbps,
             alice_gotatun_cpu_percent: cpu_percent,
             alice_iperf_cpu_percent: parsed.end.cpu_utilization_percent.host_total,
             cpu_window_seconds,
