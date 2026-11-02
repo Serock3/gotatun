@@ -201,6 +201,17 @@ async fn study(args: Run, search: Option<capacity::Search>) -> Result<()> {
                     });
                 save(&study).await?;
             }
+            let search = study
+                .capacity_search
+                .as_ref()
+                .context("missing capacity search")?;
+            eprintln!(
+                "capacity outcome={} confirmed={} passing={:?} failing={:?} Gb/s",
+                search.outcome,
+                search.confirmed,
+                search.passing_lower_gbps,
+                search.failing_upper_gbps
+            );
             return Ok(());
         }
         for repetition in 1..=study.settings.repetitions {
@@ -430,6 +441,7 @@ async fn trial(
             } else {
                 args.payload as usize
             },
+            args.payload_receive_buffer_mib,
         )?;
         let target = SocketAddrV4::new(
             args.alice,

@@ -3,10 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use crate::{batch, packets::MAGIC};
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, ensure};
 use serde::Serialize;
 use std::{
     net::{SocketAddrV4, UdpSocket},
+    os::fd::OwnedFd,
+    process::{Command, Stdio},
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -23,6 +25,8 @@ pub struct Stats {
     pub receive_buffer_bytes: usize,
     pub kernel_socket_drops: u64,
     pub arrival_span_seconds: f64,
+    /// Computed after receiving, to distinguish startup loss from sustained loss.
+    pub missing_per_100k_packets: Vec<usize>,
 }
 
 pub struct Sink {
@@ -31,13 +35,31 @@ pub struct Sink {
 }
 
 impl Sink {
-    pub fn start(bind: SocketAddrV4, count: usize, expected_len: usize) -> Result<Self> {
+    pub fn start(
+        bind: SocketAddrV4,
+        count: usize,
+        expected_len: usize,
+        force_mib: u32,
+    ) -> Result<Self> {
         let socket = UdpSocket::bind(bind).context("bind local payload receiver")?;
         let std::net::SocketAddr::V4(bind) = socket.local_addr()? else {
             unreachable!()
         };
         socket.set_read_timeout(Some(Duration::from_millis(100)))?;
-        let receive_buffer_bytes = batch::receive_buffer(&socket)?;
+        let mut receive_buffer_bytes = batch::receive_buffer(&socket)?;
+        if force_mib > 0 {
+            // Stdio safely duplicates the owned socket onto fd 0 in the child.
+            // The helper changes the shared socket, then exits before measurement.
+            let status = Command::new("sudo")
+                .arg("-n")
+                .arg(std::env::current_exe()?)
+                .args(["configure-sink", "--mib", &force_mib.to_string()])
+                .stdin(Stdio::from(OwnedFd::from(socket.try_clone()?)))
+                .stdout(Stdio::null())
+                .status()?;
+            ensure!(status.success(), "payload socket buffer helper failed");
+            receive_buffer_bytes = batch::actual_receive_buffer(&socket)?;
+        }
         let done = Arc::new(AtomicBool::new(false));
         let stop = done.clone();
         let thread = std::thread::spawn(move || {
@@ -85,6 +107,10 @@ impl Sink {
                 .map(|first| last.duration_since(first).as_secs_f64())
                 .unwrap_or_default();
             stats.kernel_socket_drops = socket_drops(bind)?;
+            stats.missing_per_100k_packets = seen
+                .chunks(100_000)
+                .map(|block| block.iter().filter(|&&received| !received).count())
+                .collect();
             Ok(stats)
         });
         Ok(Self {
@@ -101,6 +127,28 @@ impl Sink {
             .join()
             .map_err(|_| anyhow::anyhow!("receiver thread panicked"))?
     }
+}
+
+pub fn configure_inherited_socket(mib: u32) -> Result<()> {
+    ensure!((1..=64).contains(&mib), "invalid payload socket buffer");
+    let bytes = (mib * 1024 * 1024) as libc::c_int;
+    // SAFETY: setsockopt borrows the initialized option. fd 0 was installed by
+    // Stdio from the controller's cloned socket; the kernel rejects non-sockets.
+    let result = unsafe {
+        libc::setsockopt(
+            libc::STDIN_FILENO,
+            libc::SOL_SOCKET,
+            libc::SO_RCVBUFFORCE,
+            (&bytes as *const libc::c_int).cast(),
+            size_of_val(&bytes) as libc::socklen_t,
+        )
+    };
+    ensure!(
+        result == 0,
+        "SO_RCVBUFFORCE: {}",
+        std::io::Error::last_os_error()
+    );
+    Ok(())
 }
 
 impl Drop for Sink {
@@ -150,7 +198,7 @@ mod tests {
             panic!()
         };
         drop(reservation);
-        let sink = Sink::start(address, 64, 128).unwrap();
+        let sink = Sink::start(address, 65, 128, 0).unwrap();
         let tx = UdpSocket::bind("127.0.0.1:0").unwrap();
         tx.connect(address).unwrap();
         let pool = crate::packets::prepare(None, 64, 64, 1234).unwrap();
@@ -162,5 +210,6 @@ mod tests {
         assert_eq!(stats.duplicates, 1);
         assert_eq!(stats.invalid, 1);
         assert_eq!(stats.kernel_socket_drops, 0);
+        assert_eq!(stats.missing_per_100k_packets, [1]);
     }
 }

@@ -95,6 +95,7 @@ packets (~5.06 GB) **before each trial**, giving about 13 seconds of data at 3 G
 ```bash
 ./target/release/gotatun-buffered-download capacity \
   --modes gotatun --packets 4000000 --repetitions 3 --batch 64 \
+  --payload-receive-buffer-mib 8 \
   --min-gbps 2 --max-gbps 4 --resolution-gbps 0.125 \
   --loss-budget-percent 0.1 --output results/capacity/batch-64.json
 ```
@@ -118,6 +119,14 @@ trial length; the send batch controls syscall amortization and burst size. Large
 batches may increase burst loss, so they are a separate experimental condition.
 Keep the direct control demonstrably faster and check longer trains before using
 the result for regression alerts. No encrypted pool is ever reused or replayed.
+
+`--payload-receive-buffer-mib 8` raises only the local payload sink's socket
+buffer, using a short-lived `sudo -n` helper that inherits that owned socket on
+stdin. No global limit or GotaTun buffer setting changes, and the socket is closed
+at trial end. Its actual buffer size is recorded. This avoids making a small sink
+queue an accidental limiter when GotaTun delivers bursts. The receiver also
+records missing packets in sequence blocks of 100,000, computed after the trial
+from its existing bitmap without adding work to the receive loop.
 
 ## Results and analysis
 

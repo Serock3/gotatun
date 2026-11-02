@@ -14,8 +14,7 @@ use std::{
 
 pub fn receive_buffer(socket: &UdpSocket) -> Result<usize> {
     let desired: libc::c_int = 8 * 1024 * 1024;
-    let mut actual: libc::c_int = 0;
-    let mut len = size_of::<libc::c_int>() as libc::socklen_t;
+    let len = size_of::<libc::c_int>() as libc::socklen_t;
     // SAFETY: fd is live; both option pointers have the declared initialized sizes.
     unsafe {
         ensure!(
@@ -29,6 +28,15 @@ pub fn receive_buffer(socket: &UdpSocket) -> Result<usize> {
             "SO_RCVBUF: {}",
             io::Error::last_os_error()
         );
+    }
+    actual_receive_buffer(socket)
+}
+
+pub fn actual_receive_buffer(socket: &UdpSocket) -> Result<usize> {
+    let mut actual: libc::c_int = 0;
+    let mut len = size_of::<libc::c_int>() as libc::socklen_t;
+    // SAFETY: the socket is live and the option pointers have the declared sizes.
+    unsafe {
         ensure!(
             libc::getsockopt(
                 socket.as_raw_fd(),

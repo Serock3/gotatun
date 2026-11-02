@@ -38,6 +38,12 @@ enum Command {
     Drain(upload::DrainArgs),
     Endpoint(Endpoint),
     Sender(Sender),
+    /// Internal helper: enlarge only the owned UDP socket inherited on stdin.
+    #[command(hide = true)]
+    ConfigureSink {
+        #[arg(long, value_parser=clap::value_parser!(u32).range(1..=64))]
+        mib: u32,
+    },
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum, Serialize, PartialEq, Eq)]
@@ -84,6 +90,9 @@ struct Run {
     /// Override the receive-buffer limit on Alice's owned GotaTun socket only.
     #[arg(long, default_value_t=0, value_parser=clap::value_parser!(u32).range(0..=64))]
     receive_buffer_mib: u32,
+    /// Download payload sink only; leaves GotaTun and global buffer limits unchanged.
+    #[arg(long, default_value_t=0, value_parser=clap::value_parser!(u32).range(0..=64))]
+    payload_receive_buffer_mib: u32,
     #[arg(long, default_value = "buffered-io.json")]
     output: PathBuf,
 }
@@ -149,5 +158,6 @@ async fn main() -> Result<()> {
         Command::Drain(args) => tokio::task::spawn_blocking(|| upload::drain(args)).await?,
         Command::Endpoint(args) => worker::endpoint(args).await,
         Command::Sender(args) => tokio::task::spawn_blocking(|| worker::sender(args)).await?,
+        Command::ConfigureSink { mib } => sink::configure_inherited_socket(mib),
     }
 }
