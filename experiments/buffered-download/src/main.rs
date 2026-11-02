@@ -7,6 +7,7 @@
 compile_error!("the real-network I/O experiments require Linux");
 
 mod batch;
+mod capacity;
 mod outgoing;
 mod packets;
 mod run;
@@ -31,6 +32,8 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     Run(Run),
+    /// Search a paced download rate within a packet-loss budget (one selected mode).
+    Capacity(Capacity),
     Upload(Run),
     Drain(upload::DrainArgs),
     Endpoint(Endpoint),
@@ -56,7 +59,7 @@ struct Run {
     nic: String,
     #[arg(long, default_value = "bgio0")]
     interface: String,
-    #[arg(long, default_value_t=1_000_000, value_parser=clap::value_parser!(u32).range(1_000..=2_000_000))]
+    #[arg(long, default_value_t=1_000_000, value_parser=clap::value_parser!(u32).range(1_000..=6_000_000))]
     packets: u32,
     #[arg(long, default_value_t=1200, value_parser=clap::value_parser!(u16).range(64..=1400))]
     payload: u16,
@@ -83,6 +86,14 @@ struct Run {
     receive_buffer_mib: u32,
     #[arg(long, default_value = "buffered-io.json")]
     output: PathBuf,
+}
+
+#[derive(Args)]
+struct Capacity {
+    #[command(flatten)]
+    run: Run,
+    #[command(flatten)]
+    search: capacity::Options,
 }
 
 #[derive(Args)]
@@ -133,6 +144,7 @@ struct Sender {
 async fn main() -> Result<()> {
     match Cli::parse().command {
         Command::Run(args) => run::run(args).await,
+        Command::Capacity(args) => run::capacity(args).await,
         Command::Upload(args) => upload::run(args).await,
         Command::Drain(args) => tokio::task::spawn_blocking(|| upload::drain(args)).await?,
         Command::Endpoint(args) => worker::endpoint(args).await,

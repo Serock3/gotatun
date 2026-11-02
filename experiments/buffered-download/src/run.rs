@@ -3,9 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use crate::{
-    Mode, Run,
+    Capacity, Mode, Run,
     batch::SendReport,
-    packets::{ALICE_TUN, wire_len},
+    capacity,
+    packets::{ALICE_TUN, MAX_POOL_BYTES, wire_len},
     sink::{self, Sink, Stats},
     worker::run_sink_port,
 };
@@ -37,6 +38,7 @@ struct Study {
     aead_backend: &'static str,
     cpu_scope: &'static str,
     settings: Run,
+    capacity_search: Option<capacity::Search>,
     trials: Vec<Trial>,
     error: Option<String>,
 }
@@ -60,6 +62,25 @@ struct Trial {
 }
 
 pub async fn run(args: Run) -> Result<()> {
+    study(args, None).await
+}
+
+pub async fn capacity(mut args: Capacity) -> Result<()> {
+    args.search.validate()?;
+    ensure!(
+        args.run.modes.len() == 1,
+        "capacity search needs one mode; use --modes gotatun or --modes direct"
+    );
+    ensure!(
+        args.run.repetitions >= 3,
+        "capacity search requires at least three repetitions at each rate"
+    );
+    // The bounds also validate the longest expected paced trial before deployment.
+    args.run.rates = vec![args.search.min_gbps, args.search.max_gbps];
+    study(args.run, Some(capacity::Search::new(args.search))).await
+}
+
+async fn study(args: Run, search: Option<capacity::Search>) -> Result<()> {
     ensure!(
         !args.peer_kernel_drop,
         "peer-kernel-drop applies only to upload"
@@ -69,18 +90,25 @@ pub async fn run(args: Run) -> Result<()> {
         "input-loops applies only to upload, never to encrypted download pools"
     );
     validate(&args)?;
+    for &rate in &args.rates {
+        ensure!(
+            rate == 0.0 || args.packets as f64 * args.payload as f64 * 8.0 / (rate * 1e9) <= 55.0,
+            "paced download train would exceed 55 seconds"
+        );
+    }
     let _lock = MachineLock::acquire("/tmp/benchy.lock")?;
     verify_physical_route(&args).await?;
     let source_sha = String::from_utf8(checked_output("git", ["rev-parse", "HEAD"]).await?.stdout)?
         .trim()
         .to_owned();
     let mut study = Study {
-        schema_version: 1,
+        schema_version: 2,
         status: "running".into(),
         source_sha,
         aead_backend: "aws-lc-rs",
         cpu_scope: "Alice GotaTun process only; START through receiver drain, including idle tail; CPU seconds/Gbit uses delivered payload",
         settings: args,
+        capacity_search: search,
         trials: Vec::new(),
         error: None,
     };
@@ -92,25 +120,112 @@ pub async fn run(args: Run) -> Result<()> {
     let binary = std::env::current_exe()?;
     let remote_binary = format!("{remote_dir}/buffered-download");
     save(&study).await?;
-    let result=async {
-        checked_output("ssh",[&study.settings.peer,&format!("umask 077; mkdir {}",shell_quote(&remote_dir))]).await?;
-        checked_output("scp",[binary.to_string_lossy().as_ref(),&format!("{}:{remote_binary}",study.settings.peer)]).await?;
-        let mut trial_id=0;
+    let result = async {
+        checked_output(
+            "ssh",
+            [
+                &study.settings.peer,
+                &format!("umask 077; mkdir {}", shell_quote(&remote_dir)),
+            ],
+        )
+        .await?;
+        checked_output(
+            "scp",
+            [
+                binary.to_string_lossy().as_ref(),
+                &format!("{}:{remote_binary}", study.settings.peer),
+            ],
+        )
+        .await?;
+        let mut trial_id = 0;
+        if let Some(search) = &study.capacity_search {
+            let loss_budget_percent = search.options.loss_budget_percent;
+            while let Some((phase, rate)) = study
+                .capacity_search
+                .as_ref()
+                .and_then(|search| search.next())
+            {
+                ensure!(
+                    trial_id < 150,
+                    "capacity search exceeded bounded trial count"
+                );
+                let first_trial_index = study.trials.len();
+                let mut passes = true;
+                let mut max_loss_percent: f64 = 0.0;
+                for repetition in 1..=study.settings.repetitions {
+                    let trial = trial(
+                        &study.settings,
+                        &binary,
+                        &remote_binary,
+                        study.settings.modes[0],
+                        rate,
+                        repetition,
+                        19440 + trial_id,
+                    )
+                    .await?;
+                    trial_id += 1;
+                    print_trial(&trial);
+                    // Persist even a diagnostically invalid trial before rejecting it.
+                    study.trials.push(trial);
+                    save(&study).await?;
+                    let trial = study.trials.last().unwrap();
+                    passes &= capacity::accepts(
+                        rate,
+                        trial.sender.offered_payload_gbps,
+                        trial.loss_percent,
+                        loss_budget_percent,
+                        trial.receiver.kernel_socket_drops,
+                        trial.receiver.duplicates,
+                    )?;
+                    max_loss_percent = max_loss_percent.max(trial.loss_percent);
+                    tokio::select! {
+                        _=tokio::time::sleep(Duration::from_secs(2))=>{},
+                        _=tokio::signal::ctrl_c()=>anyhow::bail!("experiment interrupted"),
+                    }
+                }
+                eprintln!(
+                    "capacity {phase} {rate:.3} Gb/s: {} (worst loss {max_loss_percent:.4}%)",
+                    if passes { "PASS" } else { "FAIL" }
+                );
+                study
+                    .capacity_search
+                    .as_mut()
+                    .context("missing capacity search")?
+                    .record(capacity::Point {
+                        phase,
+                        requested_payload_gbps: rate,
+                        first_trial_index,
+                        trial_count: study.trials.len() - first_trial_index,
+                        passes,
+                        max_loss_percent,
+                    });
+                save(&study).await?;
+            }
+            return Ok(());
+        }
         for repetition in 1..=study.settings.repetitions {
             for &rate in &study.settings.rates {
                 for &mode in &study.settings.modes {
-                    let trial=trial(&study.settings,&binary,&remote_binary,mode,rate,repetition,19440+trial_id).await?;
-                    trial_id+=1;
-                    eprintln!("{mode:?} requested={rate:.2} offered={:.3} delivered={:.3} Gb/s loss={:.2}% sink_drops={} outer_drops={:?} cpu={:?}",
-                        trial.sender.offered_payload_gbps,trial.delivered_payload_gbps,trial.loss_percent,
-                        trial.receiver.kernel_socket_drops,trial.gotatun_outer_socket_drops,trial.gotatun_cpu_percent);
+                    let trial = trial(
+                        &study.settings,
+                        &binary,
+                        &remote_binary,
+                        mode,
+                        rate,
+                        repetition,
+                        19440 + trial_id,
+                    )
+                    .await?;
+                    trial_id += 1;
+                    print_trial(&trial);
                     study.trials.push(trial);
                     save(&study).await?;
                 }
             }
         }
         Ok(())
-    }.await;
+    }
+    .await;
     let cleanup = checked_output(
         "ssh",
         [
@@ -127,6 +242,20 @@ pub async fn run(args: Run) -> Result<()> {
     }
     save(&study).await?;
     result
+}
+
+fn print_trial(trial: &Trial) {
+    eprintln!(
+        "{:?} requested={:.3} offered={:.3} delivered={:.3} Gb/s loss={:.4}% sink_drops={} outer_drops={:?} cpu={:?}",
+        trial.mode,
+        trial.requested_payload_gbps,
+        trial.sender.offered_payload_gbps,
+        trial.delivered_payload_gbps,
+        trial.loss_percent,
+        trial.receiver.kernel_socket_drops,
+        trial.gotatun_outer_socket_drops,
+        trial.gotatun_cpu_percent
+    );
 }
 
 pub(crate) fn validate(args: &Run) -> Result<()> {
@@ -159,8 +288,8 @@ pub(crate) fn validate(args: &Run) -> Result<()> {
         "select one or both distinct modes"
     );
     ensure!(
-        (args.packets as usize) * wire_len(args.payload as usize) <= 2 * 1024 * 1024 * 1024,
-        "packet pool exceeds 2 GiB"
+        (args.packets as usize) * wire_len(args.payload as usize) <= MAX_POOL_BYTES,
+        "packet pool exceeds 8 GiB"
     );
     if let Some(cpus) = &args.endpoint_cpus {
         ensure!(

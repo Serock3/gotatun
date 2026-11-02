@@ -37,7 +37,9 @@ cargo build --release --locked
 Defaults use Alice `10.0.0.1`, Bob `10.0.0.2`, peer `mole@10.0.0.2`, NIC `eno2`,
 interface `bgio0`, outer UDP port 51831, sink port 19432, and one million packets
 with 1200-byte application payloads. Each trial gets new keys and a fresh pool.
-The ~1.26 GB pool is limited to 2 GiB and freed before the next trial. Control TCP
+The default ~1.26 GB pool is freed before the next trial. Download pools may use up
+to 8 GiB, but preparation refuses to consume more than half of Bob's currently
+available RAM. Upload plaintext pools retain their 2 GiB limit. Control TCP
 ports start at 19440 and advance per trial. Endpoint processes have a 120-second
 lease; sender preparation/start/transmit waits are bounded.
 
@@ -83,6 +85,39 @@ as a stable capacity benchmark. Very short trains exaggerate startup/drain effec
 Unit/integration tests cover authenticated packet generation, unique counters and
 replay rejection, batched datagram boundaries, and receiver duplicate/invalid-data
 accounting. Socket tests require a normal Linux environment (no root required).
+
+## Paced download capacity search
+
+Search for the highest offered rate within an explicit packet-loss budget. Select
+one mode and at least three repetitions. The example prepares four million fresh
+packets (~5.06 GB) **before each trial**, giving about 13 seconds of data at 3 Gb/s:
+
+```bash
+./target/release/gotatun-buffered-download capacity \
+  --modes gotatun --packets 4000000 --repetitions 3 --batch 64 \
+  --min-gbps 2 --max-gbps 4 --resolution-gbps 0.125 \
+  --loss-budget-percent 0.1 --output results/capacity/batch-64.json
+```
+
+The search tests both bounds, bisects the passing/failing bracket, then repeats
+the best passing rate for confirmation. Every repetition must meet the budget;
+losses are never averaged into a pass. It rests two seconds between trials. A
+generator rate more than 1% from the request, payload-sink socket drops, or
+duplicate payload invalidates the search and leaves a failed report with raw
+samples. Loss in GotaTun's outer receive socket remains part of the tested path.
+
+The report records every trial and decision, passing/failing bounds, and whether
+confirmation succeeded. A failed confirmation is explicitly unstable; a passing
+upper bound means only "at least the search maximum." The bracket assumes a
+roughly monotonic loss boundary and is an experimental estimate, not a confidence
+interval. `--rates` is replaced by the search bounds in this command. Paced trials
+longer than 55 seconds are refused to stay within the sender/session leases.
+
+Repeat with `--batch 256` to test larger send batches. The packet pool controls
+trial length; the send batch controls syscall amortization and burst size. Larger
+batches may increase burst loss, so they are a separate experimental condition.
+Keep the direct control demonstrably faster and check longer trains before using
+the result for regression alerts. No encrypted pool is ever reused or replayed.
 
 ## Results and analysis
 

@@ -15,6 +15,23 @@ use zerocopy::{FromBytes, IntoBytes};
 pub const ALICE_TUN: Ipv4Addr = Ipv4Addr::new(10, 0, 2, 1);
 pub const BOB_TUN: Ipv4Addr = Ipv4Addr::new(10, 0, 2, 2);
 pub const MAGIC: &[u8; 8] = b"BGIOv001";
+pub const MAX_POOL_BYTES: usize = 8 * 1024 * 1024 * 1024;
+
+/// Keep at least half the currently available RAM for the OS and other processes.
+fn check_pool_memory(size: usize) -> Result<()> {
+    let memory = std::fs::read_to_string("/proc/meminfo")?;
+    let available_kib: usize = memory
+        .lines()
+        .find_map(|line| line.strip_prefix("MemAvailable:"))
+        .and_then(|line| line.split_whitespace().next())
+        .context("MemAvailable missing")?
+        .parse()?;
+    ensure!(
+        size <= MAX_POOL_BYTES && size <= available_kib.saturating_mul(1024) / 2,
+        "packet pool needs {size} bytes; limit is 8 GiB and half of available RAM ({available_kib} KiB)"
+    );
+    Ok(())
+}
 
 pub fn inner_packet(sequence: usize, payload_len: usize, port: u16) -> Packet {
     let mut data = BytesMut::zeroed((20 + 8 + payload_len).div_ceil(16) * 16);
@@ -78,10 +95,7 @@ pub fn prepare(
     let size = count
         .checked_mul(stride)
         .context("packet buffer overflow")?;
-    ensure!(
-        size <= 2 * 1024 * 1024 * 1024,
-        "buffer exceeds the experiment's 2 GiB limit"
-    );
+    check_pool_memory(size)?;
     let started = Instant::now();
     let mut bytes = Vec::new();
     bytes
