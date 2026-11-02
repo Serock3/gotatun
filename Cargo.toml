@@ -35,6 +35,7 @@ futures = "0.3.31"
 gotatun = { path = "./gotatun", version = "0.10.2", default-features = false }
 hex = "0.4.3"
 hmac = "0.12.1"
+hotpath = { version = "=0.30.1", default-features = false }
 ip_network = "0.4.1"
 ip_network_table = "0.2.0"
 ipnetwork = "0.21.1"

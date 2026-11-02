@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["gotatun-download", "gotatun-upload", "throughput-common"]
+members = ["gotatun-hotpath", "gotatun-download", "gotatun-upload", "throughput-common"]
 
 [workspace.package]
 edition = "2024"
@@ -11,6 +11,10 @@ license = "MPL-2.0"
 anyhow = "1.0"
 benchy-lib = { path = "../../benchy/benchy-lib" }
 benchy-runner = { path = "../../benchy/benchy-runner" }
+bytes = "1.11"
+# Keep the profiler report parser and producer on the same version.
+hotpath = { version = "=0.30.1", default-features = false }
+zerocopy = { version = "0.8", features = ["std"] }
 clap = { version = "4.5", features = ["derive", "env"] }
 gotatun = { path = "../gotatun", default-features = false, features = ["device", "aws-lc-rs", "tun"] }
 hex = "0.4"

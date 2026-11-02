@@ -199,6 +199,7 @@ impl<R: RngCore + Send> Tunn<R> {
     ///
     /// If `tun_mtu` is `Some`, `packet` will be padded with `0`s to a multiple of 16 bytes,
     /// clamped to not exceed MTU.
+    #[cfg_attr(feature = "hotpath", hotpath::measure)]
     pub fn handle_outgoing_packet(
         &mut self,
         mut packet: Packet,
@@ -243,6 +244,7 @@ impl<R: RngCore + Send> Tunn<R> {
     /// Process an incoming WireGuard packet from the network.
     ///
     /// This dispatches to the appropriate handler based on packet type.
+    #[cfg_attr(feature = "hotpath", hotpath::measure)]
     pub fn handle_incoming_packet(&mut self, packet: WgKind) -> TunnResult {
         match packet {
             WgKind::HandshakeInit(p) => self.handle_handshake_init(p),
