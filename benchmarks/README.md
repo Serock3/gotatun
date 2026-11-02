@@ -86,4 +86,31 @@ A separate GitHub-hosted `Publish benchmarks` workflow receives the project's
 `BENCHER_API_KEY` Actions secret and `BENCHER_PROJECT` repository variable. The
 self-hosted benchmark job receives no publishing secret. Raw JSON remains in the
 benchmark run's summary/artifact; publishing verifies the run and artifact identity.
-Profiler experiments are separate review layers, not part of these endpoints.
+The hotpath workload below is separate from these uninstrumented endpoints.
+
+## Hotpath diagnostics
+
+`gotatun-hotpath` uses [hotpath-rs](https://hotpath.rs) 0.30.1 with its counting allocator.
+It completes a handshake, warms up with 10,000 packets in each direction, then measures 200,000
+packets per direction with a 1,200-byte IP payload and the AWS-LC AEAD backend. No sockets,
+TUN devices, or GSO code execute in this workload. It cannot validate a socket optimization.
+
+Each function is a Bencher benchmark such as `gotatun-hotpath/format_packet_data`, with shared
+`time` (inclusive ns/call) and `allocated` (exclusive B/call) measures. Parent timings include
+children and instrumentation overhead; do not add them. Allocation volume is not retained
+memory; a parent's zero excludes allocations attributed to instrumented children.
+
+Locks appear under `gotatun-hotpath/lock/<name>` with shared `lock.wait` and `lock.hold` measures
+in ns. Instances from one source site are weighted by acquisition count. This serial workload
+measures **uncontended** acquisition, not contention/scaling. Lock statistics include the
+handshake and warmup (two acquisitions per received data packet).
+
+The four expected functions are `handle_outgoing_packet`, `format_packet_data`,
+`handle_incoming_packet`, and `receive_packet_data`. The benchmark fails if any has a wrong
+call count or a timing sampling override. The full report, including original function paths, call counts,
+sampling settings and lock instances, is retained as `profiles/gotatun-hotpath.json` beside the
+raw Benchy result in the workflow artifact. Each repeated sample has its own report.
+
+These are diagnostic series, without regression thresholds. Compare them only with the same
+workload, backend, profiler version and settings. The ordinary Criterion benches remain
+available through `cargo bench`; they are not part of Benchy.

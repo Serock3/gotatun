@@ -1,0 +1,22 @@
+[package]
+name = "gotatun-hotpath-benchmark"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[package.metadata.benchy]
+id = "gotatun-hotpath"
+default = true
+
+[dependencies]
+anyhow.workspace = true
+benchy-lib.workspace = true
+benchy-runner = { workspace = true, features = ["hotpath"] }
+bytes.workspace = true
+clap.workspace = true
+gotatun = { workspace = true, features = ["hotpath-alloc"] }
+hotpath = { workspace = true, features = ["hotpath-alloc"] }
+rand.workspace = true
+tokio.workspace = true
+zerocopy.workspace = true

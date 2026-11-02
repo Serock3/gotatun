@@ -45,6 +45,7 @@ duplicate = { workspace = true, default-features = false }
 either = { workspace = true }
 eyre = { workspace = true }
 futures = { workspace = true }
+hotpath = { workspace = true, optional = true, features = ["parking_lot"] }
 hmac = { workspace = true }
 ip_network = { workspace = true }
 ip_network_table = { workspace = true }
@@ -104,6 +105,9 @@ nix = { workspace = true, default-features = false, features = [
 
 [features]
 default = ["aws-lc-rs"]
+# Profiling is opt-in; ordinary endpoints do not depend on hotpath.
+hotpath = ["dep:hotpath", "hotpath/hotpath"]
+hotpath-alloc = ["hotpath", "hotpath/hotpath-alloc"]
 daita = ["device", "dep:maybenot"]
 # Use the `ring` crate as the AEAD backend. Combine with
 # `default-features = false` to avoid also pulling in `aws-lc-rs`,
