@@ -451,7 +451,7 @@ async fn trial(
                 WG_PORT
             },
         );
-        let values = vec![
+        let mut values = vec![
             "sender".into(),
             "--mode".into(),
             if mode == Mode::Direct {
@@ -479,6 +479,9 @@ async fn trial(
             "--rate".into(),
             rate.to_string(),
         ];
+        if args.no_catch_up {
+            values.push("--no-catch-up".into());
+        }
         processes.push(
             Process::command(remote_binary)
                 .args(values)

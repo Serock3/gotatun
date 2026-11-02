@@ -156,6 +156,28 @@ pub fn send_cancellable(
     gbps: f64,
     stop: Option<&std::sync::atomic::AtomicBool>,
 ) -> Result<SendReport> {
+    send_with_policy(socket, pool, payload, batch, gbps, stop, false)
+}
+
+pub fn send_without_catch_up(
+    socket: &UdpSocket,
+    pool: &crate::packets::Pool,
+    payload: usize,
+    batch: usize,
+    gbps: f64,
+) -> Result<SendReport> {
+    send_with_policy(socket, pool, payload, batch, gbps, None, true)
+}
+
+fn send_with_policy(
+    socket: &UdpSocket,
+    pool: &crate::packets::Pool,
+    payload: usize,
+    batch: usize,
+    gbps: f64,
+    stop: Option<&std::sync::atomic::AtomicBool>,
+    no_catch_up: bool,
+) -> Result<SendReport> {
     let count = pool.bytes.len() / pool.stride;
     let mut iov = vec![
         libc::iovec {
@@ -170,6 +192,7 @@ pub fn send_cancellable(
     let mut syscalls = 0;
     let mut partial_sends = 0;
     let started = Instant::now();
+    let mut next_batch_at = started;
     while sent < count {
         ensure!(
             !stop.is_some_and(|s| s.load(std::sync::atomic::Ordering::Relaxed)),
@@ -180,8 +203,11 @@ pub fn send_cancellable(
             "packet train exceeded 60 seconds"
         );
         if gbps > 0.0 {
-            let deadline = started
-                + Duration::from_secs_f64(sent as f64 * payload as f64 * 8.0 / (gbps * 1e9));
+            let deadline = if no_catch_up {
+                next_batch_at
+            } else {
+                started + Duration::from_secs_f64(sent as f64 * payload as f64 * 8.0 / (gbps * 1e9))
+            };
             // Only Bob spins; Alice's measured process uses its normal scheduling.
             while Instant::now() < deadline {
                 ensure!(
@@ -191,6 +217,7 @@ pub fn send_cancellable(
                 std::hint::spin_loop();
             }
         }
+        let batch_started = Instant::now();
         let n = batch.min(count - sent);
         for i in 0..n {
             iov[i].iov_base = pool.bytes[(sent + i) * pool.stride..]
@@ -220,6 +247,12 @@ pub fn send_cancellable(
             ensure!(header.msg_len as usize == pool.stride, "short UDP send");
         }
         sent += result as usize;
+        if no_catch_up && gbps > 0.0 {
+            // Start each new period at the actual batch start. A scheduling
+            // stall cannot build up an arbitrarily large catch-up burst.
+            next_batch_at = batch_started
+                + Duration::from_secs_f64(result as f64 * payload as f64 * 8.0 / (gbps * 1e9));
+        }
     }
     let send_seconds = started.elapsed().as_secs_f64();
     Ok(SendReport {

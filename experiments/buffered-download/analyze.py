@@ -30,6 +30,8 @@ def summarize(files):
             assert all(t["receiver"]["invalid"] == 0 for t in trials)
             cpu_cost = [t["gotatun_cpu_seconds_per_payload_gigabit"] for t in trials
                         if t.get("gotatun_cpu_seconds_per_payload_gigabit") is not None]
+            missing = [t["receiver"].get("missing_per_100k_packets") for t in trials]
+            has_breakdown = all(blocks is not None for blocks in missing)
             yield {
                 "study": file.stem,
                 "mode": mode,
@@ -42,6 +44,8 @@ def summarize(files):
                 "delivered_sample_sd_gbps": statistics.stdev(delivered) if len(delivered) > 1 else "",
                 "loss_mean_percent": statistics.mean(t["loss_percent"] for t in trials),
                 "loss_max_percent": max(t["loss_percent"] for t in trials),
+                "first_100k_missing_total": sum(blocks[0] for blocks in missing) if has_breakdown else "",
+                "later_missing_total": sum(sum(blocks[1:]) for blocks in missing) if has_breakdown else "",
                 "sender_seconds_mean": statistics.mean(t["sender"]["send_seconds"] for t in trials),
                 "preparation_seconds_mean": statistics.mean(t["sender"]["prepare_seconds"] for t in trials),
                 "sink_drop_total": sum(t["receiver"]["kernel_socket_drops"] for t in trials),

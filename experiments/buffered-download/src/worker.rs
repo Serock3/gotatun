@@ -199,7 +199,12 @@ pub fn sender(args: Sender) -> Result<()> {
     let mut start = [0u8; 8];
     client.read_exact(&mut start)?;
     ensure!(&start == b"STARTv1\n", "unexpected controller command");
-    let report = batch::send(
+    let send = if args.no_catch_up {
+        batch::send_without_catch_up
+    } else {
+        batch::send
+    };
+    let report = send(
         &socket,
         &pool,
         args.payload as usize,

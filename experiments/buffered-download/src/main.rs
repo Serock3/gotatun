@@ -71,6 +71,9 @@ struct Run {
     payload: u16,
     #[arg(long, default_value_t=64, value_parser=clap::value_parser!(u16).range(1..=256))]
     batch: u16,
+    /// Download only: resume normal batch spacing after a scheduling delay.
+    #[arg(long)]
+    no_catch_up: bool,
     /// Offered application-payload Gb/s. Zero means unpaced maximum.
     #[arg(long, value_delimiter = ',', default_value = "1,2,3,4,6,8,0")]
     rates: Vec<f64>,
@@ -127,6 +130,8 @@ struct Endpoint {
 
 #[derive(Args)]
 struct Sender {
+    #[arg(long)]
+    no_catch_up: bool,
     #[arg(long)]
     mode: Mode,
     #[arg(long)]

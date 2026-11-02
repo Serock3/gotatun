@@ -394,6 +394,7 @@ impl Nic {
 
 pub async fn run(args: Run) -> Result<()> {
     crate::run::validate(&args)?;
+    ensure!(!args.no_catch_up, "no-catch-up applies only to download");
     ensure!(
         args.payload_receive_buffer_mib == 0,
         "payload-receive-buffer-mib applies only to download"

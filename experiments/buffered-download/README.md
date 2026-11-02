@@ -128,6 +128,12 @@ queue an accidental limiter when GotaTun delivers bursts. The receiver also
 records missing packets in sequence blocks of 100,000, computed after the trial
 from its existing bitmap without adding work to the receive loop.
 
+`--no-catch-up` spaces batches from each actual batch start, rather than catching
+up to the original schedule after a sender stall. This can reduce unintended
+bursts, at the cost of a slightly lower actual offered rate. The capacity search
+still requires that rate to be within 1% of the request. Both pacing policies
+retain the same syscall/buffer path and cross the physical NICs.
+
 ## Results and analysis
 
 See [RESULTS.md](RESULTS.md) for the first Alice/Bob studies and limitations. Raw
