@@ -1,0 +1,94 @@
+name: Dial9 profile
+
+on:
+  workflow_dispatch:
+    inputs:
+      cpu-sample-hz:
+        description: On-CPU sampling frequency in Hz
+        required: false
+        default: 999
+        type: number
+      iperf-seconds:
+        description: Seconds per iperf3 direction (send and receive each)
+        required: false
+        default: 5
+        type: number
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    name: Profile gotatun with dial9
+    # Manual only on purpose: profiling is heavy and the traces are artifacts,
+    # not part of the benchmark series that Bencher tracks.
+    runs-on: ["self-hosted", "Linux", "benchy"]
+    timeout-minutes: 30
+    env:
+      TRACE_SUBDIR: dial9-traces-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Checkout gotatun
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+          path: source
+      - name: Checkout Benchy
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          repository: Serock3/benchy
+          ref: afe6ad3777db316cb4f4dff768429ac2bac40733
+          path: benchy
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6  # v1.16.1
+        with:
+          rust-src-dir: source
+          cache: false
+      - name: Build the profiling harness
+        working-directory: source/dial9
+        # The toolchain action exports RUSTFLAGS, which overrides dial9/.cargo/config.toml and
+        # would silently drop tokio_unstable and the frame pointers dial9 requires. Keep the
+        # action's -D warnings on top of the config flags.
+        env:
+          RUSTFLAGS: --cfg tokio_unstable -C force-frame-pointers=yes -D warnings
+        run: cargo build --locked --profile profiling
+      - name: Report CPU profiling permissions
+        run: |
+          paranoid=$(cat /proc/sys/kernel/perf_event_paranoid)
+          echo "perf_event_paranoid=$paranoid; the profiled process runs through sudo. Check cpu.profile.backend in the trace for the actual backend."
+      - name: Record the tunnel under dial9
+        env:
+          BENCHY_PEER: ${{ vars.BENCHY_PEER }}
+          BENCHY_ALICE_ADDRESS: ${{ vars.BENCHY_ALICE_ADDRESS }}
+          BENCHY_BOB_ADDRESS: ${{ vars.BENCHY_BOB_ADDRESS }}
+          BENCHY_WIREGUARD_PORT: ${{ vars.BENCHY_WIREGUARD_PORT }}
+          TRACE_DIR: ${{ runner.temp }}/${{ env.TRACE_SUBDIR }}
+          CPU_SAMPLE_HZ: ${{ inputs.cpu-sample-hz }}
+          IPERF_SECONDS: ${{ inputs.iperf-seconds }}
+        run: |
+          source/dial9/target/profiling/gotatun-dial9 run \
+            --trace-dir "$TRACE_DIR" \
+            --cpu-sample-hz "$CPU_SAMPLE_HZ" \
+            --iperf-seconds "$IPERF_SECONDS"
+          {
+            echo '## Dial9 profile'
+            echo
+            echo "Source: \`$GITHUB_SHA\`"
+            echo "Workload: TCP iperf, $IPERF_SECONDS seconds sending followed by $IPERF_SECONDS seconds receiving."
+            echo "Trace artifact: \`$TRACE_SUBDIR\` (7-day retention)."
+            echo 'Use dial9/README.md to view and validate the downloaded trace.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload dial9 traces
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: ${{ env.TRACE_SUBDIR }}
+          path: ${{ runner.temp }}/${{ env.TRACE_SUBDIR }}
+          retention-days: 7
+          if-no-files-found: error
+      - name: Free the runner disk
+        if: ${{ always() }}
+        # Root writes the trace files; remove only this attempt's directory after upload.
+        env:
+          TRACE_DIR: ${{ runner.temp }}/${{ env.TRACE_SUBDIR }}
+        run: sudo -n rm -rf "$TRACE_DIR"
