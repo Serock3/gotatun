@@ -1,0 +1,19 @@
+[package]
+name = "gotatun-benchmark-common"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+benchy-lib.workspace = true
+benchy-runner.workspace = true
+clap.workspace = true
+gotatun.workspace = true
+hex.workspace = true
+ipnetwork.workspace = true
+rand.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

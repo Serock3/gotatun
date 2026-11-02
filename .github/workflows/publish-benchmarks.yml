@@ -1,0 +1,24 @@
+name: Publish benchmarks
+
+on:
+  workflow_run:
+    workflows: [Benchmarks]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  publish:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      actions: read
+      contents: read
+      checks: write
+      pull-requests: write
+    uses: Serock3/benchy/.github/workflows/publish-benchmarks.yml@afe6ad3777db316cb4f4dff768429ac2bac40733
+    with:
+      bencher-project: ${{ vars.BENCHER_PROJECT }}
+      # Establish a new AWS-LC baseline before calibrating project-specific thresholds.
+      bencher-testbed: alice-bob-aws-lc-v1
+    secrets:
+      BENCHER_API_KEY: ${{ secrets.BENCHER_API_KEY }}

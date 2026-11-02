@@ -1,0 +1,33 @@
+name: Benchmarks
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 1 * * *'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      benchmarks:
+        description: Comma or space-delimited benchmark IDs, or "default"/"all"
+        required: false
+        default: default
+        type: string
+      iterations:
+        description: Complete runs per benchmark (1–100), default 1
+        required: false
+        default: 1
+        type: number
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    uses: Serock3/benchy/.github/workflows/run-benchmarks.yml@afe6ad3777db316cb4f4dff768429ac2bac40733
+    with:
+      benchmarks: ${{ inputs.benchmarks || 'default' }}
+      iterations: ${{ fromJSON(format('{0}', inputs.iterations || 1)) }}
+      manifest-path: benchmarks/Cargo.toml
+      framework-ref: afe6ad3777db316cb4f4dff768429ac2bac40733
