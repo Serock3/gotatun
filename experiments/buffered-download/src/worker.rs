@@ -29,9 +29,10 @@ use std::{
 /// Bind-time configuration only; packet I/O still uses the production socket.
 struct Factory {
     force_bytes: u32,
+    sent: Option<Arc<crate::outgoing::Counters>>,
 }
 impl UdpTransportFactory for Factory {
-    type Send = GotatunSocket;
+    type Send = crate::outgoing::CountedSend<GotatunSocket>;
     type Recv = GotatunSocket;
     async fn bind(
         &mut self,
@@ -60,7 +61,13 @@ impl UdpTransportFactory for Factory {
                 return Err(std::io::Error::last_os_error());
             }
         }
-        Ok((send, recv))
+        Ok((
+            crate::outgoing::CountedSend {
+                inner: send,
+                counters: self.sent.clone(),
+            },
+            recv,
+        ))
     }
 }
 
@@ -71,6 +78,7 @@ pub fn key(value: &str) -> Result<[u8; 32]> {
 }
 
 pub async fn endpoint(args: Endpoint) -> Result<()> {
+    let counters = Arc::new(crate::outgoing::Counters::new(args.data_wire_len));
     ensure!(
         args.receive_buffer_mib <= 64,
         "receive buffer exceeds experiment limit"
@@ -89,6 +97,7 @@ pub async fn endpoint(args: Endpoint) -> Result<()> {
         .with_peer(peer)
         .with_udp(Factory {
             force_bytes: args.receive_buffer_mib * 1024 * 1024,
+            sent: args.send_report.as_ref().map(|_| counters.clone()),
         })
         .with_listen_port(args.bind.port())
         .create_tun(&args.interface)
@@ -121,6 +130,9 @@ pub async fn endpoint(args: Endpoint) -> Result<()> {
     }
     .await;
     device.stop().await;
+    if let Some(path) = args.send_report {
+        std::fs::write(path, serde_json::to_vec_pretty(&counters.snapshot())?)?;
+    }
     result
 }
 
@@ -142,7 +154,11 @@ pub fn sender(args: Sender) -> Result<()> {
     socket.set_read_timeout(Some(Duration::from_millis(500)))?;
     socket.set_write_timeout(Some(Duration::from_secs(2)))?;
     let mut tunnel = if args.mode == Mode::Gotatun {
-        Some(handshake(&socket, &args)?)
+        Some(handshake(
+            &socket,
+            &args.private_key,
+            &args.peer_public_key,
+        )?)
     } else {
         None
     };
@@ -207,12 +223,16 @@ pub const fn run_sink_port() -> u16 {
     19432
 }
 
-fn handshake(socket: &UdpSocket, args: &Sender) -> Result<Tunn> {
-    let private = StaticSecret::from(key(&args.private_key)?);
+pub(crate) fn handshake(
+    socket: &UdpSocket,
+    private_key: &str,
+    peer_public_key: &str,
+) -> Result<Tunn> {
+    let private = StaticSecret::from(key(private_key)?);
     let public = PublicKey::from(&private);
     let mut tunnel = Tunn::new(
         private,
-        PublicKey::from(key(&args.peer_public_key)?),
+        PublicKey::from(key(peer_public_key)?),
         None,
         None,
         IndexTable::from_os_rng(),

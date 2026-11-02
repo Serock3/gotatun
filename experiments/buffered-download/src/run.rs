@@ -121,7 +121,7 @@ pub async fn run(args: Run) -> Result<()> {
     result
 }
 
-fn validate(args: &Run) -> Result<()> {
+pub(crate) fn validate(args: &Run) -> Result<()> {
     ensure!(
         args.alice != args.bob && !args.alice.is_loopback() && !args.bob.is_loopback(),
         "use two physical hosts"
@@ -166,7 +166,7 @@ fn validate(args: &Run) -> Result<()> {
     Ok(())
 }
 
-async fn verify_physical_route(args: &Run) -> Result<()> {
+pub(crate) async fn verify_physical_route(args: &Run) -> Result<()> {
     let local = checked_output("ip", ["-j", "route", "get", &args.bob.to_string()]).await?;
     let remote = checked_output(
         "ssh",

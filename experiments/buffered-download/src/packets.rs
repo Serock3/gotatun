@@ -44,6 +44,30 @@ pub struct Pool {
     pub prepare_seconds: f64,
 }
 
+/// Application input for upload: payload bytes, rather than outer-sized control datagrams.
+pub fn payload_pool(count: usize, payload_len: usize) -> Result<Pool> {
+    let size = count
+        .checked_mul(payload_len)
+        .context("payload buffer overflow")?;
+    ensure!(
+        payload_len >= 16 && size <= 2 * 1024 * 1024 * 1024,
+        "invalid payload buffer"
+    );
+    let start = Instant::now();
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(size)?;
+    bytes.resize(size, 0);
+    for (seq, data) in bytes.chunks_exact_mut(payload_len).enumerate() {
+        data[..8].copy_from_slice(MAGIC);
+        data[8..16].copy_from_slice(&(seq as u64).to_le_bytes());
+    }
+    Ok(Pool {
+        bytes,
+        stride: payload_len,
+        prepare_seconds: start.elapsed().as_secs_f64(),
+    })
+}
+
 pub fn prepare(
     mut tunnel: Option<&mut Tunn>,
     count: usize,

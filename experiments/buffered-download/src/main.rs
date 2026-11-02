@@ -7,9 +7,11 @@
 compile_error!("the buffered download experiment requires Linux");
 
 mod batch;
+mod outgoing;
 mod packets;
 mod run;
 mod sink;
+mod upload;
 mod worker;
 
 use anyhow::Result;
@@ -29,6 +31,8 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     Run(Run),
+    Upload(Run),
+    Drain(upload::DrainArgs),
     Endpoint(Endpoint),
     Sender(Sender),
 }
@@ -71,12 +75,16 @@ struct Run {
     /// Override the receive-buffer limit on Alice's owned GotaTun socket only.
     #[arg(long, default_value_t=0, value_parser=clap::value_parser!(u32).range(0..=64))]
     receive_buffer_mib: u32,
-    #[arg(long, default_value = "buffered-download.json")]
+    #[arg(long, default_value = "buffered-io.json")]
     output: PathBuf,
 }
 
 #[derive(Args)]
 struct Endpoint {
+    #[arg(long)]
+    send_report: Option<PathBuf>,
+    #[arg(long, default_value_t = 0)]
+    data_wire_len: usize,
     #[arg(long, default_value_t = 0)]
     receive_buffer_mib: u32,
     #[arg(long)]
@@ -119,6 +127,8 @@ struct Sender {
 async fn main() -> Result<()> {
     match Cli::parse().command {
         Command::Run(args) => run::run(args).await,
+        Command::Upload(args) => upload::run(args).await,
+        Command::Drain(args) => tokio::task::spawn_blocking(|| upload::drain(args)).await?,
         Command::Endpoint(args) => worker::endpoint(args).await,
         Command::Sender(args) => tokio::task::spawn_blocking(|| worker::sender(args)).await?,
     }

@@ -137,6 +137,17 @@ pub fn send(
     batch: usize,
     gbps: f64,
 ) -> Result<SendReport> {
+    send_cancellable(socket, pool, payload, batch, gbps, None)
+}
+
+pub fn send_cancellable(
+    socket: &UdpSocket,
+    pool: &crate::packets::Pool,
+    payload: usize,
+    batch: usize,
+    gbps: f64,
+    stop: Option<&std::sync::atomic::AtomicBool>,
+) -> Result<SendReport> {
     let count = pool.bytes.len() / pool.stride;
     let mut iov = vec![
         libc::iovec {
@@ -153,6 +164,10 @@ pub fn send(
     let started = Instant::now();
     while sent < count {
         ensure!(
+            !stop.is_some_and(|s| s.load(std::sync::atomic::Ordering::Relaxed)),
+            "generator cancelled"
+        );
+        ensure!(
             started.elapsed() < Duration::from_secs(60),
             "packet train exceeded 60 seconds"
         );
@@ -161,6 +176,10 @@ pub fn send(
                 + Duration::from_secs_f64(sent as f64 * payload as f64 * 8.0 / (gbps * 1e9));
             // Only Bob spins; Alice's measured process uses its normal scheduling.
             while Instant::now() < deadline {
+                ensure!(
+                    !stop.is_some_and(|s| s.load(std::sync::atomic::Ordering::Relaxed)),
+                    "generator cancelled"
+                );
                 std::hint::spin_loop();
             }
         }
