@@ -64,12 +64,17 @@ struct Run {
     /// Optional taskset CPU list for Alice's GotaTun process only.
     #[arg(long)]
     endpoint_cpus: Option<String>,
+    /// Override the receive-buffer limit on Alice's owned GotaTun socket only.
+    #[arg(long, default_value_t=0, value_parser=clap::value_parser!(u32).range(0..=64))]
+    receive_buffer_mib: u32,
     #[arg(long, default_value = "buffered-download.json")]
     output: PathBuf,
 }
 
 #[derive(Args)]
 struct Endpoint {
+    #[arg(long, default_value_t = 0)]
+    receive_buffer_mib: u32,
     #[arg(long)]
     private_key: String,
     #[arg(long)]

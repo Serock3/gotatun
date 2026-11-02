@@ -45,11 +45,14 @@ struct Trial {
     sender: SendReport,
     receiver: Stats,
     delivered_payload_gbps: f64,
+    delivery_window_seconds: f64,
+    payload_per_send_window_gbps: f64,
     loss_percent: f64,
     gotatun_cpu_percent: Option<f64>,
     cpu_window_seconds: Option<f64>,
     gotatun_cpu_seconds_per_payload_gigabit: Option<f64>,
     gotatun_outer_socket_drops: Option<u64>,
+    gotatun_receive_buffer_bytes: Option<u64>,
 }
 
 pub async fn run(args: Run) -> Result<()> {
@@ -137,7 +140,12 @@ fn validate(args: &Run) -> Result<()> {
                 .all(|r| r.is_finite() && (*r == 0.0 || (0.5..=9.0).contains(r))),
         "rates must be 0 (unpaced) or 0.5–9 Gb/s"
     );
-    ensure!(!args.modes.is_empty(), "select at least one mode");
+    ensure!(
+        !args.modes.is_empty()
+            && args.modes.len() <= 2
+            && (args.modes.len() == 1 || args.modes[0] != args.modes[1]),
+        "select one or both distinct modes"
+    );
     ensure!(
         (args.packets as usize) * wire_len(args.payload as usize) <= 2 * 1024 * 1024 * 1024,
         "packet pool exceeds 2 GiB"
@@ -215,6 +223,8 @@ async fn trial(
         let endpoint_pid = if mode == Mode::Gotatun {
             let mut values = vec![
                 "endpoint".into(),
+                "--receive-buffer-mib".into(),
+                args.receive_buffer_mib.to_string(),
                 "--private-key".into(),
                 hex::encode(private.to_bytes()),
                 "--peer-public-key".into(),
@@ -239,6 +249,27 @@ async fn trial(
             };
             processes.push(builder.sudo().ready_when("ENDPOINT_READY").spawn().await?);
             Some(processes.last().unwrap().pid())
+        } else {
+            None
+        };
+        let gotatun_receive_buffer_bytes = if mode == Mode::Gotatun {
+            let output = checked_output(
+                "ss",
+                ["-u", "-a", "-n", "-m", &format!("sport = :{WG_PORT}")],
+            )
+            .await?;
+            let text = String::from_utf8(output.stdout)?;
+            let memory = text
+                .split("skmem:(")
+                .nth(1)
+                .context("missing socket memory information")?;
+            Some(
+                memory
+                    .split(',')
+                    .find_map(|part| part.strip_prefix("rb"))
+                    .context("missing actual receive buffer")?
+                    .parse()?,
+            )
         } else {
             None
         };
@@ -356,11 +387,15 @@ async fn trial(
         let cpu_cost = cpu_percent
             .zip(cpu_window)
             .map(|(pct, seconds)| pct / 100.0 * seconds / delivered_gigabits);
+        // Count any post-send draining as processing time, rather than apparent capacity.
+        let delivery_window_seconds = sender.send_seconds.max(receiver.arrival_span_seconds);
         Ok(Trial {
             mode,
             requested_payload_gbps: rate,
             repetition,
-            delivered_payload_gbps: delivered_gigabits / sender.send_seconds,
+            delivered_payload_gbps: delivered_gigabits / delivery_window_seconds,
+            delivery_window_seconds,
+            payload_per_send_window_gbps: delivered_gigabits / sender.send_seconds,
             loss_percent: 100.0 * (1.0 - receiver.unique as f64 / args.packets as f64),
             sender,
             receiver,
@@ -368,6 +403,7 @@ async fn trial(
             cpu_window_seconds: cpu_window,
             gotatun_cpu_seconds_per_payload_gigabit: cpu_cost,
             gotatun_outer_socket_drops: outer_drops,
+            gotatun_receive_buffer_bytes,
         })
     };
     let result = tokio::select! {result=work=>result,_=tokio::signal::ctrl_c()=>Err(anyhow::anyhow!("experiment interrupted"))};

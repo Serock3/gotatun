@@ -8,14 +8,57 @@ use gotatun::{
     device::{DeviceBuilder, Peer},
     noise::{Tunn, TunnResult, index_table::IndexTable, rate_limiter::RateLimiter},
     packet::{Packet, WgKind},
+    udp::{
+        UdpTransportFactory, UdpTransportFactoryParams,
+        socket::{UdpSocket as GotatunSocket, UdpSocketFactory},
+    },
     x25519::{PublicKey, StaticSecret},
 };
 use std::{
     io::{Read, Write},
     net::{TcpListener, UdpSocket},
+    os::fd::AsRawFd,
     sync::Arc,
     time::{Duration, Instant},
 };
+
+/// Bind-time configuration only; packet I/O still uses the production socket.
+struct Factory {
+    force_bytes: u32,
+}
+impl UdpTransportFactory for Factory {
+    type Send = GotatunSocket;
+    type Recv = GotatunSocket;
+    async fn bind(
+        &mut self,
+        params: &UdpTransportFactoryParams,
+    ) -> std::io::Result<(Self::Send, Self::Recv)> {
+        let (send, recv) = UdpSocketFactory {
+            recv_buffer_size: Some(7 * 1024 * 1024),
+            send_buffer_size: Some(7 * 1024 * 1024),
+        }
+        .bind(params)
+        .await?;
+        if self.force_bytes > 0 {
+            let bytes = self.force_bytes as libc::c_int;
+            // SAFETY: the live socket and initialized option value are borrowed
+            // for this synchronous syscall. Only this owned socket is changed.
+            let result = unsafe {
+                libc::setsockopt(
+                    recv.socket().as_raw_fd(),
+                    libc::SOL_SOCKET,
+                    libc::SO_RCVBUFFORCE,
+                    (&bytes as *const libc::c_int).cast(),
+                    size_of_val(&bytes) as libc::socklen_t,
+                )
+            };
+            if result != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+        }
+        Ok((send, recv))
+    }
+}
 
 pub fn key(value: &str) -> Result<[u8; 32]> {
     hex::decode(value)?
@@ -24,6 +67,10 @@ pub fn key(value: &str) -> Result<[u8; 32]> {
 }
 
 pub async fn endpoint(args: Endpoint) -> Result<()> {
+    ensure!(
+        args.receive_buffer_mib <= 64,
+        "receive buffer exceeds experiment limit"
+    );
     ensure!(
         checked_output("ip", ["link", "show", &args.interface])
             .await
@@ -36,10 +83,10 @@ pub async fn endpoint(args: Endpoint) -> Result<()> {
     let mut device = DeviceBuilder::new()
         .with_private_key(StaticSecret::from(key(&args.private_key)?))
         .with_peer(peer)
-        .with_default_udp()
+        .with_udp(Factory {
+            force_bytes: args.receive_buffer_mib * 1024 * 1024,
+        })
         .with_listen_port(args.bind.port())
-        .udp_recv_buffer_size(7 * 1024 * 1024)
-        .udp_send_buffer_size(7 * 1024 * 1024)
         .create_tun(&args.interface)
         .context("create experimental TUN")?
         .build()
