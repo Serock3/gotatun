@@ -73,8 +73,13 @@ impl BufferedIpSend {
                 .await
                 .expect("Deadlock on IpSend. There must be no more than one IpSend active at any given time.");
 
-            while let Some(packet) = rx.recv().await {
-                if let Err(e) = inner.send(packet).await {
+            let mut batch = Vec::new();
+            loop {
+                let n = rx.recv_many(&mut batch, usize::MAX).await;
+                if n == 0 {
+                    break;
+                }
+                if let Err(e) = inner.send_batch(batch.drain(..)).await {
                     if is_fatal_tun_error(&e) {
                         tracing::error!("TUN device was deleted: {e}");
                         break;

@@ -32,6 +32,8 @@ pub use tun;
 
 #[cfg(feature = "tun")]
 pub mod tun_async_device;
+#[cfg(all(target_os = "linux", feature = "tun"))]
+pub(crate) mod offload;
 
 /// A type that let's you send an IP packet.
 ///
@@ -41,6 +43,21 @@ pub trait IpSend: Send + Sync + 'static {
     /// Send a complete IP packet.
     // TODO: consider refactoring trait with methods that take `Packet<Ipv4>` and `Packet<Ipv6>`
     fn send(&mut self, packet: Packet<Ip>) -> impl Future<Output = io::Result<()>> + Send;
+
+    /// Send a batch of complete IP packets, in order. Implementations may
+    /// combine them (e.g. into one GRO-sized TUN write); the default sends
+    /// them one by one.
+    fn send_batch(
+        &mut self,
+        packets: impl ExactSizeIterator<Item = Packet<Ip>> + Send,
+    ) -> impl Future<Output = io::Result<()>> + Send {
+        async move {
+            for packet in packets {
+                self.send(packet).await?;
+            }
+            Ok(())
+        }
+    }
 }
 
 /// A type that let's you receive an IP packet.
