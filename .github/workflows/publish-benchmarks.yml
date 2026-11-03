@@ -23,7 +23,7 @@ jobs:
       # iperf CPU stays diagnostic because it scales with traffic volume.
       threshold-policy: >-
         {"minimum_samples":5,"maximum_samples":10,"measures":{
-          "throughput-network":{"lower":0.07},
+          "throughput-network":{"lower":0.02},
           "cpu-gotatun":{"upper":0.10},
           "time":{"upper":0.10},
           "allocated":{"upper":0.05},
