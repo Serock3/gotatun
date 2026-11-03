@@ -15,10 +15,11 @@ jobs:
       contents: read
       checks: write
       pull-requests: write
-    uses: Serock3/benchy/.github/workflows/publish-benchmarks.yml@main
+    uses: Serock3/benchy/.github/workflows/publish-benchmarks.yml@afe6ad3777db316cb4f4dff768429ac2bac40733
     with:
       bencher-project: ${{ vars.BENCHER_PROJECT }}
-      # Calibrated on repeated complete main runs; see benchmarks/DEMO.md.
+      # Fresh AWS-LC/kernel-peer baseline; historical calibration is in benchmarks/DEMO.md.
+      bencher-testbed: alice-bob-kernel-peer-v1
       # iperf CPU stays diagnostic because it scales with traffic volume.
       threshold-policy: >-
         {"minimum_samples":5,"maximum_samples":10,"measures":{

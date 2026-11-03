@@ -59,7 +59,7 @@ async fn main() -> Result<()> {
     recorder.parameter("packets_per_direction", PACKETS_PER_DIRECTION);
     recorder.parameter("warmup_packets_per_direction", WARMUP_PACKETS_PER_DIRECTION);
     recorder.parameter("payload_len", PAYLOAD_LEN);
-    recorder.parameter("aead_backend", "ring");
+    recorder.parameter("aead_backend", "aws-lc-rs");
     recorder.parameter("hotpath_version", "0.30.1");
     recorder.parameter(
         "profiling",

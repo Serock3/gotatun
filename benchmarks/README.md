@@ -1,50 +1,98 @@
 # GotaTun system benchmarks
 
-This is a separate Cargo workspace containing the benchmark definitions for this repository. The
-shared runner and temporary result artifacts live in the sibling `benchy` repository.
+This separate Cargo workspace embeds GotaTun from this checkout. Benchy supplies the
+runner, result schema and GitHub/Bencher integration from a sibling `benchy` checkout.
 
-Run the default benchmark set through `benchy-cli` from `benchy`, or run the first scenario
-directly:
+## Workload and measurements
+
+`gotatun-upload` sends TCP traffic from Alice to Bob; `gotatun-download` sends from
+Bob to Alice. Both measure Alice only. Alice embeds GotaTun; Bob runs Linux kernel
+WireGuard and the iperf server, without CPU sampling or profiling. Kernel/kernel
+controls on the benchmark machines establish peer headroom in each direction.
+
+Both benchmarks report shared measures:
+
+- `throughput.network`: Alice's sender or receiver throughput, stored in bits/s and
+  published as Gb/s.
+- `cpu.gotatun`: Alice's GotaTun process CPU, from the change in `/proc/PID/stat`
+  user/system time over the full iperf invocation, including setup and omitted
+  warmup, across all its threads.
+- `cpu.iperf`: Alice's iperf process CPU, from its local JSON report.
+
+CPU is expressed as a percentage of one logical CPU (200% means two CPUs), without
+uncertainty bounds. Throughput uses the local one-second intervals to estimate the
+standard error of the mean. This assumes between-run variance is negligible; it is
+not an estimate of between-run variance. Raw reports retain the estimate's method.
+
+The embedded endpoint selects AWS-LC, matching GotaTun's default crypto backend.
+Its independently resolved lockfile pins the same AWS-LC version as the root
+lockfile. Changing the peer and warmup requires fresh baselines; the prepared
+publisher uses `alice-bob-kernel-peer-v1`, separate from the old runs.
+
+Each test has a three-second pre-test excluded from iperf's throughput summary and
+interval uncertainty. CPU covers both warmup and measured traffic. The default
+measured phase remains 30 seconds. The kernel peer still has finite capacity;
+repeat the headroom control as GotaTun throughput approaches its measured limit.
+
+## Running
 
 ```console
-cargo run --release --locked \
-  --config 'target."cfg(unix)".runner="/usr/bin/env"' \
-  --manifest-path benchmarks/Cargo.toml \
-  --package gotatun-download-benchmark
+cargo build --release --locked --manifest-path benchmarks/Cargo.toml -p gotatun-upload-benchmark
+./benchmarks/target/release/gotatun-upload-benchmark
 ```
 
-The two network benchmarks share an uninstrumented controller in `throughput-common`. Each
-builds and deploys its own executable, embeds GotaTun, and invokes `ip`, `ssh`, `scp`, `ping`,
-`ss` and `iperf3`. Both hosts need passwordless sudo for endpoint setup and cleanup.
+Run the controller directly as the SSH user; the repository's Cargo runner uses
+sudo for the product CLI. The benchmark itself elevates only endpoint setup.
 
-Alice is always the iperf client and the measured host. `gotatun-download` uses reverse mode
-(Bob → Alice); `gotatun-upload` uses normal mode (Alice → Bob). Both record exactly the same
-three measurements: `throughput.network`, `cpu.gotatun`, and `cpu.iperf`. Throughput uses Alice's
-receiver summary for download and sender summary for upload. CPU samples come only from
-Alice: GotaTun's process ticks and iperf's local CPU total. Alice's local one-second intervals
-provide throughput uncertainty in either direction; Bob's JSON report is not requested. Bob needs
-no process CPU sampling.
-CPU percentages are normalized to one logical core and may exceed 100%.
+The controller needs Rust, a C compiler/CMake for AWS-LC, `ip`, `ping`, `iperf3`,
+`ssh`, `scp`, `ss`, and passwordless sudo to create a TUN endpoint. Bob needs the
+runtime tools, `wg` (wireguard-tools), kernel WireGuard support and sudo; it receives
+the benchmark executable over SSH. Processes are stopped by their recorded PID.
+Endpoints have a bounded lease as a fallback if the controller loses its SSH
+connection. Both benchmarks acquire
+`/tmp/benchy.lock` to exclude local/manual runs as well as Actions jobs.
 
-## What each workflow measures
+Both endpoints refuse existing interfaces. Bob's helper accepts generated keys
+through its arguments and passes them to `wg setconf` via stdin, without writing
+key/config files. It removes its temporary interface on SIGINT, SIGTERM or lease
+expiry. After shutdown the controller also checks for a leftover peer interface
+with its unique ownership label; an interface with a different label is preserved
+and the cleanup failure is reported. Deployments use private random temporary
+directories. No global buffer limits, NIC settings or persistent WG config change.
 
-| Workflow / benchmark | Output | Meaning |
-| --- | --- | --- |
-| Benchmarks / `gotatun-download` | Gb/s and logical-core CPU % | Bob → Alice, measured on Alice; GotaTun is uninstrumented. |
-| Benchmarks / `gotatun-upload` | Same shared measures | Alice → Bob, measured on Alice; GotaTun is uninstrumented. |
-| Benchmarks / `gotatun-hotpath` | ns/call, allocated B/call, lock ns | Two in-process tunnels exchanging packets, with hotpath instrumentation. |
-| Dial9 profile | Trace artifact | Alice's full device under TCP send then receive; manual, no Bencher values. |
+Configuration is read at runtime:
 
-All three numeric benchmarks are in the default set. Select IDs in the manual workflow to run only
-one. The network benchmarks run on pushes to fork main and approved PRs; the nightly workflow
-refreshes main. Profiling and throughput builds are separate, so Cargo feature unification does
-not instrument the network measurement.
+| Variable | Default |
+| --- | --- |
+| `BENCHY_PEER` | `mole@10.0.0.2` |
+| `BENCHY_ALICE_ADDRESS` | `10.0.0.1` |
+| `BENCHY_BOB_ADDRESS` | `10.0.0.2` |
+| `BENCHY_INTERFACE` | `bench0` |
+| `BENCHY_WIREGUARD_PORT` | `51821` |
+| `BENCHY_IPERF_PORT` | `5201` |
+| `BENCHY_DURATION` | `30` seconds (1–120) |
+| `BENCHY_WARMUP` | `3` seconds (0–30), excluded from throughput |
+| `BENCHY_MTU` | `1440` |
+
+Keys are generated per run. SSH identity/host keys are provisioned on the controller.
+
+## Actions
+
+`Benchmarks` runs on pushes to main, nightly, on internal PRs, and manually with a
+benchmark selection and iteration count. External PR jobs require maintainer
+approval before running contributor code on the dedicated machines.
+
+A separate GitHub-hosted `Publish benchmarks` workflow receives the project's
+`BENCHER_API_KEY` Actions secret and `BENCHER_PROJECT` repository variable. The
+self-hosted benchmark job receives no publishing secret. Raw JSON remains in the
+benchmark run's summary/artifact; publishing verifies the run and artifact identity.
+The hotpath workload below is separate from these uninstrumented endpoints.
 
 ## Hotpath diagnostics
 
 `gotatun-hotpath` uses [hotpath-rs](https://hotpath.rs) 0.30.1 with its counting allocator.
 It completes a handshake, warms up with 10,000 packets in each direction, then measures 200,000
-packets per direction with a 1,200-byte IP payload and the `ring` AEAD backend. No sockets,
+packets per direction with a 1,200-byte IP payload and the AWS-LC AEAD backend. No sockets,
 TUN devices, or GSO code execute in this workload. It cannot validate a socket optimization.
 
 Each function is a Bencher benchmark such as `gotatun-hotpath/format_packet_data`, with shared
@@ -66,19 +114,3 @@ raw Benchy result in the workflow artifact. Each repeated sample has its own rep
 These are diagnostic series, without regression thresholds. Compare them only with the same
 workload, backend, profiler version and settings. The ordinary Criterion benches remain
 available through `cargo bench`; they are not part of Benchy.
-
-## Network configuration
-
-Configuration is read at runtime:
-
-- `BENCHY_PEER` (default `mole@10.0.0.2`)
-- `BENCHY_ALICE_ADDRESS` (default `10.0.0.1`)
-- `BENCHY_BOB_ADDRESS` (default `10.0.0.2`)
-- `BENCHY_INTERFACE` (default `bench0`)
-- `BENCHY_WIREGUARD_PORT` (default `51821`)
-- `BENCHY_IPERF_PORT` (default `5201`)
-- `BENCHY_DURATION` (default `30` seconds)
-- `BENCHY_MTU` (default `1440`)
-
-WireGuard key material is generated for each run and is not stored in GitHub. The SSH host identity
-is provisioned on the benchmark controller rather than injected into branch-controlled code.

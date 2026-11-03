@@ -25,9 +25,9 @@ permissions:
 
 jobs:
   benchmark:
-    uses: Serock3/benchy/.github/workflows/run-benchmarks.yml@346dba8c31970157ec4a5ea89ef061b2912f3c8c
+    uses: Serock3/benchy/.github/workflows/run-benchmarks.yml@afe6ad3777db316cb4f4dff768429ac2bac40733
     with:
       benchmarks: ${{ inputs.benchmarks || 'default' }}
       iterations: ${{ fromJSON(format('{0}', inputs.iterations || 1)) }}
       manifest-path: benchmarks/Cargo.toml
-      framework-ref: 346dba8c31970157ec4a5ea89ef061b2912f3c8c
+      framework-ref: afe6ad3777db316cb4f4dff768429ac2bac40733

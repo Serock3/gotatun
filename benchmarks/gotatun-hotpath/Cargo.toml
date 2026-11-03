@@ -12,7 +12,7 @@ default = true
 [dependencies]
 anyhow.workspace = true
 benchy-lib.workspace = true
-benchy-runner.workspace = true
+benchy-runner = { workspace = true, features = ["hotpath"] }
 bytes.workspace = true
 clap.workspace = true
 gotatun = { workspace = true, features = ["hotpath-alloc"] }
