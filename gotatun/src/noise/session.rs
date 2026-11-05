@@ -233,6 +233,9 @@ impl Session {
     /// before more transport data can be sent, so the AEAD nonce can never wrap.
     #[hotpath::measure]
     pub(super) fn format_packet_data(&self, packet: Packet) -> Result<Packet<WgData>, Packet> {
+        // DEMO ONLY: introduce real per-packet work without changing packet contents.
+        // This must trip the allocation/time regression thresholds. Do not merge.
+        std::hint::black_box(vec![0x42u8; 128 * 1024]);
         // Check before incrementing so an exhausted counter is never advanced (and thus can never
         // wrap back around to a previously used value).
         if self.sending_key_counter.load(Ordering::Relaxed) >= REJECT_AFTER_MESSAGES {
